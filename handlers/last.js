@@ -1,13 +1,25 @@
 const { getLastActiveTransactions } = require("../services/googleSheets");
 
+// ==============================
+// ✅ FORMAT HELPERS
+// ==============================
+
 function formatRupiah(value) {
   const number = Number(String(value).replace(/[^\d.-]/g, "")) || 0;
 
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(number);
+  return "Rp " + number.toLocaleString("id-ID");
+}
+
+function formatTanggal(dateStr) {
+  if (!dateStr) return "-";
+
+  const date = new Date(dateStr);
+
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function getJenisIcon(jenis) {
@@ -19,6 +31,10 @@ function getJenisIcon(jenis) {
   return "•";
 }
 
+// ==============================
+// ✅ HANDLER
+// ==============================
+
 module.exports = (bot) => {
   bot.command("last", async (ctx) => {
     try {
@@ -28,17 +44,17 @@ module.exports = (bot) => {
         return ctx.reply("📭 Belum ada transaksi aktif di Google Sheet.");
       }
 
-      const lines = ["🧾 5 Transaksi Terakhir", ""];
+      const lines = ["📋 5 Transaksi Terakhir", ""];
 
       transactions.forEach((trx, index) => {
         const jenis = trx["Jenis Transaksi"] || "-";
         const icon = getJenisIcon(jenis);
         const account = trx["Account"] || "-";
-        const nominal = formatRupiah(trx["Nominal"] || 0);
+        const nominal = formatRupiah(trx["Nominal"]);
         const kategori = trx["Kategori"] || "-";
         const dompetSumber = trx["Dompet Sumber"] || "-";
         const dompetTujuan = trx["Dompet Tujuan"] || "-";
-        const tanggal = trx["Tanggal Transaksi"] || "-";
+        const tanggal = formatTanggal(trx["Tanggal Transaksi"]);
         const keterangan = trx["Keterangan"] || "-";
 
         let dompetText = "-";
@@ -53,12 +69,13 @@ module.exports = (bot) => {
 
         lines.push(
           `${index + 1}. ${icon} ${jenis}\n` +
-          `Account: ${account}\n` +
-          `Nominal: ${nominal}\n` +
-          `Kategori: ${kategori}\n` +
-          `Dompet: ${dompetText}\n` +
-          `Tanggal: ${tanggal}\n` +
-          `Ket: ${keterangan}`
+          `💳 Account : ${account}\n` +
+          `💰 Nominal : ${nominal}\n` +
+          `📂 Kategori: ${kategori}\n` +
+          `🏦 Dompet  : ${dompetText}\n` +
+          `📅 Tanggal : ${tanggal}\n` +
+          `📝 Ket     : ${keterangan}\n` +
+          `━━━━━━━━━━━━━━`
         );
       });
 
