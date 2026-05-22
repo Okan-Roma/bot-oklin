@@ -3,6 +3,7 @@ const env = require("../config/env");
 
 // handlers
 const pingHandler = require("../handlers/ping");
+const lastHandler = require("../handlers/last");
 
 let bot = null;
 
@@ -20,6 +21,7 @@ if (env.BOT_TOKEN) {
 
   // ✅ REGISTER HANDLER
   pingHandler(bot);
+  lastHandler(bot);
 }
 
 module.exports = bot;

@@ -58,9 +58,11 @@ app.listen(PORT, () => {
 // ==============================
 
 if (bot) {
-  bot.launch()
+  bot.launch({ dropPendingUpdates: true })
     .then(() => console.log("Bot aktif ✅"))
-    .catch((err) => console.error(err));
+    .catch((err) => {
+      console.error("Gagal launch bot:", err.message);
+    });
 }
 
 process.once("SIGINT", () => bot && bot.stop("SIGINT"));
