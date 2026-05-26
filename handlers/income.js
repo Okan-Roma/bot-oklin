@@ -1,4 +1,5 @@
 const { Markup } = require("telegraf");
+const { getActiveWalletsByAccount } = require("../services/googleSheets");
 
 // ==============================
 // ✅ SESSION SEMENTARA
@@ -34,7 +35,6 @@ function parseNominal(input) {
     .toLowerCase()
     .replace(/\s/g, "");
 
-  // ubah koma ke titik untuk desimal: 1,5jt => 1.5jt
   text = text.replace(",", ".");
 
   let multiplier = 1;
@@ -56,7 +56,6 @@ function parseNominal(input) {
     text = text.replace("jt", "");
   }
 
-  // hapus titik ribuan untuk angka biasa: 20.000 => 20000
   if (multiplier === 1) {
     text = text.replace(/\./g, "");
   }
@@ -99,6 +98,22 @@ function buildCategoryKeyboard() {
       Markup.button.callback("❌ Batal", "income_cancel"),
     ],
   ]);
+}
+
+function buildWalletKeyboard(wallets) {
+  const rows = [];
+
+  for (let i = 0; i < wallets.length; i += 2) {
+    const row = wallets.slice(i, i + 2).map((wallet) => {
+      return Markup.button.callback(wallet, `income_wallet:${wallet}`);
+    });
+
+    rows.push(row);
+  }
+
+  rows.push([Markup.button.callback("❌ Batal", "income_cancel")]);
+
+  return Markup.inlineKeyboard(rows);
 }
 
 // ==============================
@@ -176,13 +191,60 @@ module.exports = (bot) => {
 
     incomeSessions.set(userKey, session);
 
+    try {
+      const wallets = await getActiveWalletsByAccount(session.account);
+
+      if (!wallets.length) {
+        return ctx.reply(
+          `⚠️ Tidak ada dompet aktif untuk account ${session.account}.\n` +
+          `Silakan cek tab Dompet di Google Sheet.`
+        );
+      }
+
+      return ctx.reply(
+        `✅ Kategori dipilih: ${category}\n\n` +
+        `Pilih dompet tujuan untuk pemasukan:`,
+        buildWalletKeyboard(wallets)
+      );
+    } catch (error) {
+      console.error("Error ambil dompet:", error);
+
+      return ctx.reply(
+        "⚠️ Bot sedang kesulitan membaca daftar dompet.\nSilakan coba lagi beberapa detik."
+      );
+    }
+  });
+
+  // ==============================
+  // ✅ Pilih Dompet Tujuan
+  // ==============================
+
+  bot.action(/^income_wallet:(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const wallet = ctx.match[1];
+    const userKey = getUserSessionKey(ctx);
+    const session = incomeSessions.get(userKey);
+
+    if (!session || session.flow !== "income") {
+      return ctx.reply(
+        "⚠️ Sesi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
+      );
+    }
+
+    session.wallet = wallet;
+    session.step = "date";
+
+    incomeSessions.set(userKey, session);
+
     return ctx.reply(
-      `✅ Kategori dipilih: ${category}\n\n` +
+      `✅ Dompet tujuan dipilih: ${wallet}\n\n` +
       `Ringkasan sementara:\n` +
       `Account  : ${session.account}\n` +
       `Nominal  : ${formatRupiah(session.nominal)}\n` +
-      `Kategori : ${session.category}\n\n` +
-      `Tahap berikutnya: pilih dompet tujuan.\n\n` +
+      `Kategori : ${session.category}\n` +
+      `Dompet   : ${session.wallet}\n\n` +
+      `Tahap berikutnya: pilih tanggal transaksi.\n\n` +
       `Untuk tahap ini flow berhenti dulu di sini.`
     );
   });
@@ -208,17 +270,14 @@ module.exports = (bot) => {
     const userKey = getUserSessionKey(ctx);
     const session = incomeSessions.get(userKey);
 
-    // Kalau user tidak sedang di flow pemasukan, lanjutkan ke handler lain
     if (!session || session.flow !== "income") {
       return next();
     }
 
-    // Jika user mengetik command saat flow aktif
     if (ctx.message.text.startsWith("/")) {
       return next();
     }
 
-    // Kalau sedang menunggu nominal
     if (session.step === "amount") {
       const nominalInput = ctx.message.text;
       const nominal = parseNominal(nominalInput);

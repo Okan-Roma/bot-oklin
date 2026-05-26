@@ -27,12 +27,12 @@ async function getSheetsClient() {
   });
 }
 
-async function getTransactionRows() {
+async function getSheetRows(sheetName, range = "A:Z") {
   const sheets = await getSheetsClient();
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: "Transaksi!A:Z",
+    range: `${sheetName}!${range}`,
   });
 
   const values = response.data.values || [];
@@ -55,6 +55,10 @@ async function getTransactionRows() {
   });
 }
 
+async function getTransactionRows() {
+  return getSheetRows("Transaksi", "A:Z");
+}
+
 async function getLastActiveTransactions(limit = 5) {
   const rows = await getTransactionRows();
 
@@ -63,10 +67,28 @@ async function getLastActiveTransactions(limit = 5) {
     return status === "aktif";
   });
 
-  // Ambil 5 terakhir dari urutan sheet, lalu dibalik supaya paling baru tampil di atas
   return activeRows.slice(-limit).reverse();
+}
+
+async function getActiveWalletsByAccount(account) {
+  const rows = await getSheetRows("Dompet", "A:G");
+
+  return rows
+    .filter((item) => {
+      const itemAccount = (item["Account"] || "").toString().trim().toLowerCase();
+      const status = (item["Status"] || "").toString().trim().toLowerCase();
+
+      return itemAccount === account.toLowerCase() && status === "aktif";
+    })
+    .sort((a, b) => {
+      const urutanA = Number(a["Urutan"] || 999);
+      const urutanB = Number(b["Urutan"] || 999);
+      return urutanA - urutanB;
+    })
+    .map((item) => item["Nama Dompet"]);
 }
 
 module.exports = {
   getLastActiveTransactions,
+  getActiveWalletsByAccount,
 };
