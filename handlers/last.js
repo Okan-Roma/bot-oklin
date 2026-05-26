@@ -6,7 +6,6 @@ const { getLastActiveTransactions } = require("../services/googleSheets");
 
 function formatRupiah(value) {
   const number = Number(String(value).replace(/[^\d.-]/g, "")) || 0;
-
   return "Rp " + number.toLocaleString("id-ID");
 }
 
@@ -44,7 +43,8 @@ module.exports = (bot) => {
         return ctx.reply("📭 Belum ada transaksi aktif di Google Sheet.");
       }
 
-      const lines = ["📋 5 Transaksi Terakhir", ""];
+      const divider = "━━━━━━━━━━━━━━━━━━━━";
+      const lines = ["📋 5 Transaksi Terakhir", divider, ""];
 
       transactions.forEach((trx, index) => {
         const jenis = trx["Jenis Transaksi"] || "-";
@@ -69,17 +69,18 @@ module.exports = (bot) => {
 
         lines.push(
           `${index + 1}. ${icon} ${jenis}\n` +
-          `💳 Account : ${account}\n` +
-          `💰 Nominal : ${nominal}\n` +
-          `📂 Kategori: ${kategori}\n` +
-          `🏦 Dompet  : ${dompetText}\n` +
-          `📅 Tanggal : ${tanggal}\n` +
-          `📝 Ket     : ${keterangan}\n` +
-          `━━━━━━━━━━━━━━`
+          `💳 Account  : ${account}\n` +
+          `💰 Nominal  : ${nominal}\n` +
+          `📂 Kategori : ${kategori}\n` +
+          `🏦 Dompet   : ${dompetText}\n` +
+          `📅 Tanggal  : ${tanggal}\n` +
+          `📝 Ket      : ${keterangan}\n` +
+          `${divider}`
         );
       });
 
       return ctx.reply(lines.join("\n\n"));
+
     } catch (error) {
       console.error("Error /last:", error);
 
