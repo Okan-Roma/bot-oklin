@@ -3,8 +3,7 @@ const { Markup } = require("telegraf");
 // ==============================
 // ✅ SESSION SEMENTARA
 // ==============================
-// Nanti bisa kita rapikan ke state manager terpisah.
-// Untuk tahap awal, Map ini cukup aman.
+
 const incomeSessions = new Map();
 
 // ==============================
@@ -13,8 +12,18 @@ const incomeSessions = new Map();
 
 const ACCOUNTS = ["Oklin", "Mamah", "Isal"];
 
+const INCOME_CATEGORIES = [
+  "Gaji",
+  "Bonus",
+  "Komisi",
+  "Penjualan",
+  "Transfer Masuk",
+  "Refund",
+  "Lainnya",
+];
+
 // ==============================
-// ✅ HELPER NOMINAL
+// ✅ HELPER
 // ==============================
 
 function parseNominal(input) {
@@ -69,12 +78,38 @@ function getUserSessionKey(ctx) {
   return String(ctx.from.id);
 }
 
+function buildCategoryKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback("Gaji", "income_category:Gaji"),
+      Markup.button.callback("Bonus", "income_category:Bonus"),
+    ],
+    [
+      Markup.button.callback("Komisi", "income_category:Komisi"),
+      Markup.button.callback("Penjualan", "income_category:Penjualan"),
+    ],
+    [
+      Markup.button.callback("Transfer Masuk", "income_category:Transfer Masuk"),
+    ],
+    [
+      Markup.button.callback("Refund", "income_category:Refund"),
+      Markup.button.callback("Lainnya", "income_category:Lainnya"),
+    ],
+    [
+      Markup.button.callback("❌ Batal", "income_cancel"),
+    ],
+  ]);
+}
+
 // ==============================
 // ✅ HANDLER PEMASUKAN
 // ==============================
 
 module.exports = (bot) => {
-  // Klik tombol ➕ Pemasukan
+  // ==============================
+  // ✅ Klik tombol ➕ Pemasukan
+  // ==============================
+
   bot.action("menu_income", async (ctx) => {
     await ctx.answerCbQuery();
 
@@ -91,7 +126,10 @@ module.exports = (bot) => {
     );
   });
 
-  // Pilih account
+  // ==============================
+  // ✅ Pilih Account
+  // ==============================
+
   bot.action(/^income_account:(.+)$/, async (ctx) => {
     await ctx.answerCbQuery();
 
@@ -116,7 +154,43 @@ module.exports = (bot) => {
     );
   });
 
-  // Batal pemasukan
+  // ==============================
+  // ✅ Pilih Kategori
+  // ==============================
+
+  bot.action(/^income_category:(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const category = ctx.match[1];
+    const userKey = getUserSessionKey(ctx);
+    const session = incomeSessions.get(userKey);
+
+    if (!session || session.flow !== "income") {
+      return ctx.reply(
+        "⚠️ Sesi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
+      );
+    }
+
+    session.category = category;
+    session.step = "wallet";
+
+    incomeSessions.set(userKey, session);
+
+    return ctx.reply(
+      `✅ Kategori dipilih: ${category}\n\n` +
+      `Ringkasan sementara:\n` +
+      `Account  : ${session.account}\n` +
+      `Nominal  : ${formatRupiah(session.nominal)}\n` +
+      `Kategori : ${session.category}\n\n` +
+      `Tahap berikutnya: pilih dompet tujuan.\n\n` +
+      `Untuk tahap ini flow berhenti dulu di sini.`
+    );
+  });
+
+  // ==============================
+  // ✅ Batal Pemasukan
+  // ==============================
+
   bot.action("income_cancel", async (ctx) => {
     await ctx.answerCbQuery();
 
@@ -126,13 +200,21 @@ module.exports = (bot) => {
     return ctx.reply("❌ Input pemasukan dibatalkan.");
   });
 
-  // Tangkap input text untuk nominal
+  // ==============================
+  // ✅ Tangkap Input Text Nominal
+  // ==============================
+
   bot.on("text", async (ctx, next) => {
     const userKey = getUserSessionKey(ctx);
     const session = incomeSessions.get(userKey);
 
     // Kalau user tidak sedang di flow pemasukan, lanjutkan ke handler lain
     if (!session || session.flow !== "income") {
+      return next();
+    }
+
+    // Jika user mengetik command saat flow aktif
+    if (ctx.message.text.startsWith("/")) {
       return next();
     }
 
@@ -162,8 +244,8 @@ module.exports = (bot) => {
 
       return ctx.reply(
         `✅ Nominal diterima: ${formatRupiah(nominal)}\n\n` +
-        `Tahap berikutnya: pilih kategori pemasukan.\n\n` +
-        `Untuk tahap ini flow berhenti dulu di sini.`
+        `Pilih kategori pemasukan:`,
+        buildCategoryKeyboard()
       );
     }
 
