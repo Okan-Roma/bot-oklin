@@ -213,6 +213,20 @@ function buildDateKeyboard() {
   ]);
 }
 
+function buildConfirmKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback("✅ Simpan", "income_save"),
+      Markup.button.callback("✏️ Edit Ulang", "income_edit_restart"),
+    ],
+    [Markup.button.callback("❌ Batal", "income_cancel")],
+  ]);
+}
+
+// ==============================
+// ✅ HELPER SUMMARY
+// ==============================
+
 function buildIncomeSummary(session) {
   return (
     `Ringkasan sementara:\n` +
@@ -221,6 +235,32 @@ function buildIncomeSummary(session) {
     `Kategori : ${session.category}\n` +
     `Dompet   : ${session.wallet}\n` +
     `Tanggal  : ${session.transactionDate}`
+  );
+}
+
+function buildDescriptionPrompt(session) {
+  return (
+    `✅ Tanggal transaksi diterima: ${session.transactionDate}\n\n` +
+    `${buildIncomeSummary(session)}\n\n` +
+    `Masukkan keterangan transaksi.\n\n` +
+    `Contoh:\n` +
+    `Gaji bulan Mei\n\n` +
+    `Jika tidak ada keterangan, ketik:\n` +
+    `-`
+  );
+}
+
+function buildFinalIncomeSummary(session) {
+  return (
+    `🧾 Konfirmasi Pemasukan\n\n` +
+    `Account    : ${session.account}\n` +
+    `Jenis      : Pemasukan\n` +
+    `Nominal    : ${formatRupiah(session.nominal)}\n` +
+    `Kategori   : ${session.category}\n` +
+    `Dompet     : ${session.wallet}\n` +
+    `Tanggal    : ${session.transactionDate}\n` +
+    `Keterangan : ${session.description || "-"}\n\n` +
+    `Apakah data sudah benar?`
   );
 }
 
@@ -378,8 +418,11 @@ module.exports = (bot) => {
     return ctx.reply(
       `✅ Tanggal transaksi dipilih: ${session.transactionDate}\n\n` +
         `${buildIncomeSummary(session)}\n\n` +
-        `Tahap berikutnya: input keterangan transaksi.\n\n` +
-        `Untuk tahap ini flow berhenti dulu di sini.`
+        `Masukkan keterangan transaksi.\n\n` +
+        `Contoh:\n` +
+        `Gaji bulan Mei\n\n` +
+        `Jika tidak ada keterangan, ketik:\n` +
+        `-`
     );
   });
 
@@ -411,6 +454,46 @@ module.exports = (bot) => {
         `Catatan:\n` +
         `- Tidak boleh tanggal masa depan\n` +
         `- Maksimal 30 hari ke belakang`
+    );
+  });
+
+  // ==============================
+  // ✅ Konfirmasi Simpan
+  // ==============================
+
+  bot.action("income_save", async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const userKey = getUserSessionKey(ctx);
+    const session = incomeSessions.get(userKey);
+
+    if (!session || session.flow !== "income" || session.step !== "confirm") {
+      return ctx.reply(
+        "⚠️ Sesi konfirmasi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
+      );
+    }
+
+    return ctx.reply(
+      `✅ Data pemasukan sudah siap disimpan.\n\n` +
+        `${buildFinalIncomeSummary(session)}\n\n` +
+        `Catatan:\n` +
+        `Penyimpanan ke Google Sheet akan kita aktifkan di Step 4F.`
+    );
+  });
+
+  // ==============================
+  // ✅ Edit Ulang
+  // ==============================
+
+  bot.action("income_edit_restart", async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const userKey = getUserSessionKey(ctx);
+    incomeSessions.delete(userKey);
+
+    return ctx.reply(
+      "✏️ Input pemasukan diulang.\n\n" +
+        "Silakan mulai lagi dari menu ➕ Pemasukan."
     );
   });
 
@@ -507,11 +590,24 @@ module.exports = (bot) => {
 
       incomeSessions.set(userKey, session);
 
+      return ctx.reply(buildDescriptionPrompt(session));
+    }
+
+    // ==============================
+    // ✅ Input Keterangan
+    // ==============================
+
+    if (session.step === "description") {
+      const descriptionInput = ctx.message.text.trim();
+
+      session.description = descriptionInput || "-";
+      session.step = "confirm";
+
+      incomeSessions.set(userKey, session);
+
       return ctx.reply(
-        `✅ Tanggal transaksi diterima: ${session.transactionDate}\n\n` +
-          `${buildIncomeSummary(session)}\n\n` +
-          `Tahap berikutnya: input keterangan transaksi.\n\n` +
-          `Untuk tahap ini flow berhenti dulu di sini.`
+        buildFinalIncomeSummary(session),
+        buildConfirmKeyboard()
       );
     }
 
