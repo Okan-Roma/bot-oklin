@@ -24,7 +24,7 @@ const INCOME_CATEGORIES = [
 ];
 
 // ==============================
-// ✅ HELPER
+// ✅ HELPER NOMINAL
 // ==============================
 
 function parseNominal(input) {
@@ -73,6 +73,97 @@ function formatRupiah(value) {
   return "Rp " + Number(value || 0).toLocaleString("id-ID");
 }
 
+// ==============================
+// ✅ HELPER TANGGAL WIB
+// ==============================
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function getTodayWIBDateOnly() {
+  const parts = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(new Date());
+
+  const day = Number(parts.find((p) => p.type === "day").value);
+  const month = Number(parts.find((p) => p.type === "month").value);
+  const year = Number(parts.find((p) => p.type === "year").value);
+
+  return new Date(year, month - 1, day);
+}
+
+function formatDateToDDMMYYYY(date) {
+  const day = pad2(date.getDate());
+  const month = pad2(date.getMonth() + 1);
+  const year = date.getFullYear();
+
+  return `${day}-${month}-${year}`;
+}
+
+function parseManualDate(input) {
+  const text = String(input || "").trim();
+
+  const match = text.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  const date = new Date(year, month - 1, day);
+
+  const isValidDate =
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day;
+
+  if (!isValidDate) {
+    return null;
+  }
+
+  return date;
+}
+
+function validateTransactionDate(date) {
+  const today = getTodayWIBDateOnly();
+
+  if (date > today) {
+    return {
+      valid: false,
+      message:
+        "⚠️ Tanggal transaksi tidak boleh tanggal masa depan.\n\n" +
+        "Silakan masukkan tanggal lagi dengan format DD-MM-YYYY.",
+    };
+  }
+
+  const diffMs = today.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays > 30) {
+    return {
+      valid: false,
+      message:
+        "⚠️ Tanggal transaksi maksimal 30 hari ke belakang.\n\n" +
+        "Silakan masukkan tanggal lagi dengan format DD-MM-YYYY.",
+    };
+  }
+
+  return {
+    valid: true,
+  };
+}
+
+// ==============================
+// ✅ HELPER SESSION & KEYBOARD
+// ==============================
+
 function getUserSessionKey(ctx) {
   return String(ctx.from.id);
 }
@@ -94,9 +185,7 @@ function buildCategoryKeyboard() {
       Markup.button.callback("Refund", "income_category:Refund"),
       Markup.button.callback("Lainnya", "income_category:Lainnya"),
     ],
-    [
-      Markup.button.callback("❌ Batal", "income_cancel"),
-    ],
+    [Markup.button.callback("❌ Batal", "income_cancel")],
   ]);
 }
 
@@ -114,6 +203,25 @@ function buildWalletKeyboard(wallets) {
   rows.push([Markup.button.callback("❌ Batal", "income_cancel")]);
 
   return Markup.inlineKeyboard(rows);
+}
+
+function buildDateKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("📅 Hari Ini", "income_date_today")],
+    [Markup.button.callback("✏️ Input Tanggal Manual", "income_date_manual")],
+    [Markup.button.callback("❌ Batal", "income_cancel")],
+  ]);
+}
+
+function buildIncomeSummary(session) {
+  return (
+    `Ringkasan sementara:\n` +
+    `Account  : ${session.account}\n` +
+    `Nominal  : ${formatRupiah(session.nominal)}\n` +
+    `Kategori : ${session.category}\n` +
+    `Dompet   : ${session.wallet}\n` +
+    `Tanggal  : ${session.transactionDate}`
+  );
 }
 
 // ==============================
@@ -160,12 +268,12 @@ module.exports = (bot) => {
 
     return ctx.reply(
       `✅ Account dipilih: ${account}\n\n` +
-      `Masukkan nominal pemasukan.\n\n` +
-      `Contoh:\n` +
-      `- 20000\n` +
-      `- 20k\n` +
-      `- 100rb\n` +
-      `- 1,5jt`
+        `Masukkan nominal pemasukan.\n\n` +
+        `Contoh:\n` +
+        `- 20000\n` +
+        `- 20k\n` +
+        `- 100rb\n` +
+        `- 1,5jt`
     );
   });
 
@@ -197,13 +305,13 @@ module.exports = (bot) => {
       if (!wallets.length) {
         return ctx.reply(
           `⚠️ Tidak ada dompet aktif untuk account ${session.account}.\n` +
-          `Silakan cek tab Dompet di Google Sheet.`
+            `Silakan cek tab Dompet di Google Sheet.`
         );
       }
 
       return ctx.reply(
         `✅ Kategori dipilih: ${category}\n\n` +
-        `Pilih dompet tujuan untuk pemasukan:`,
+          `Pilih dompet tujuan untuk pemasukan:`,
         buildWalletKeyboard(wallets)
       );
     } catch (error) {
@@ -239,13 +347,70 @@ module.exports = (bot) => {
 
     return ctx.reply(
       `✅ Dompet tujuan dipilih: ${wallet}\n\n` +
-      `Ringkasan sementara:\n` +
-      `Account  : ${session.account}\n` +
-      `Nominal  : ${formatRupiah(session.nominal)}\n` +
-      `Kategori : ${session.category}\n` +
-      `Dompet   : ${session.wallet}\n\n` +
-      `Tahap berikutnya: pilih tanggal transaksi.\n\n` +
-      `Untuk tahap ini flow berhenti dulu di sini.`
+        `Pilih tanggal transaksi:`,
+      buildDateKeyboard()
+    );
+  });
+
+  // ==============================
+  // ✅ Pilih Tanggal Hari Ini
+  // ==============================
+
+  bot.action("income_date_today", async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const userKey = getUserSessionKey(ctx);
+    const session = incomeSessions.get(userKey);
+
+    if (!session || session.flow !== "income") {
+      return ctx.reply(
+        "⚠️ Sesi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
+      );
+    }
+
+    const today = getTodayWIBDateOnly();
+
+    session.transactionDate = formatDateToDDMMYYYY(today);
+    session.step = "description";
+
+    incomeSessions.set(userKey, session);
+
+    return ctx.reply(
+      `✅ Tanggal transaksi dipilih: ${session.transactionDate}\n\n` +
+        `${buildIncomeSummary(session)}\n\n` +
+        `Tahap berikutnya: input keterangan transaksi.\n\n` +
+        `Untuk tahap ini flow berhenti dulu di sini.`
+    );
+  });
+
+  // ==============================
+  // ✅ Pilih Input Tanggal Manual
+  // ==============================
+
+  bot.action("income_date_manual", async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const userKey = getUserSessionKey(ctx);
+    const session = incomeSessions.get(userKey);
+
+    if (!session || session.flow !== "income") {
+      return ctx.reply(
+        "⚠️ Sesi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
+      );
+    }
+
+    session.step = "date_manual";
+    incomeSessions.set(userKey, session);
+
+    return ctx.reply(
+      `✏️ Masukkan tanggal transaksi.\n\n` +
+        `Format wajib:\n` +
+        `DD-MM-YYYY\n\n` +
+        `Contoh:\n` +
+        `16-05-2026\n\n` +
+        `Catatan:\n` +
+        `- Tidak boleh tanggal masa depan\n` +
+        `- Maksimal 30 hari ke belakang`
     );
   });
 
@@ -263,7 +428,7 @@ module.exports = (bot) => {
   });
 
   // ==============================
-  // ✅ Tangkap Input Text Nominal
+  // ✅ Tangkap Input Text
   // ==============================
 
   bot.on("text", async (ctx, next) => {
@@ -278,6 +443,10 @@ module.exports = (bot) => {
       return next();
     }
 
+    // ==============================
+    // ✅ Input Nominal
+    // ==============================
+
     if (session.step === "amount") {
       const nominalInput = ctx.message.text;
       const nominal = parseNominal(nominalInput);
@@ -285,13 +454,13 @@ module.exports = (bot) => {
       if (!nominal) {
         return ctx.reply(
           "⚠️ Nominal belum dikenali.\n\n" +
-          "Gunakan format:\n" +
-          "- 20000\n" +
-          "- 20k\n" +
-          "- 100rb\n" +
-          "- 5jt\n" +
-          "- 1,5jt\n\n" +
-          "Silakan masukkan nominal lagi."
+            "Gunakan format:\n" +
+            "- 20000\n" +
+            "- 20k\n" +
+            "- 100rb\n" +
+            "- 5jt\n" +
+            "- 1,5jt\n\n" +
+            "Silakan masukkan nominal lagi."
         );
       }
 
@@ -303,8 +472,46 @@ module.exports = (bot) => {
 
       return ctx.reply(
         `✅ Nominal diterima: ${formatRupiah(nominal)}\n\n` +
-        `Pilih kategori pemasukan:`,
+          `Pilih kategori pemasukan:`,
         buildCategoryKeyboard()
+      );
+    }
+
+    // ==============================
+    // ✅ Input Tanggal Manual
+    // ==============================
+
+    if (session.step === "date_manual") {
+      const dateInput = ctx.message.text;
+      const parsedDate = parseManualDate(dateInput);
+
+      if (!parsedDate) {
+        return ctx.reply(
+          "⚠️ Format tanggal belum dikenali.\n\n" +
+            "Gunakan format:\n" +
+            "DD-MM-YYYY\n\n" +
+            "Contoh:\n" +
+            "16-05-2026\n\n" +
+            "Silakan masukkan tanggal lagi."
+        );
+      }
+
+      const validation = validateTransactionDate(parsedDate);
+
+      if (!validation.valid) {
+        return ctx.reply(validation.message);
+      }
+
+      session.transactionDate = formatDateToDDMMYYYY(parsedDate);
+      session.step = "description";
+
+      incomeSessions.set(userKey, session);
+
+      return ctx.reply(
+        `✅ Tanggal transaksi diterima: ${session.transactionDate}\n\n` +
+          `${buildIncomeSummary(session)}\n\n` +
+          `Tahap berikutnya: input keterangan transaksi.\n\n` +
+          `Untuk tahap ini flow berhenti dulu di sini.`
       );
     }
 
