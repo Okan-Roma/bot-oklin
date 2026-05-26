@@ -91,4 +91,18 @@ async function getActiveWalletsByAccount(account) {
 module.exports = {
   getLastActiveTransactions,
   getActiveWalletsByAccount,
+  appendTransactionRow,
 };
+
+async function appendTransactionRow(rowData) {
+  const sheets = await getSheetsClient();
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: "Transaksi!A:Z",
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: [rowData],
+    },
+  });
+}

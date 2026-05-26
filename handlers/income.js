@@ -1,5 +1,8 @@
 const { Markup } = require("telegraf");
-const { getActiveWalletsByAccount } = require("../services/googleSheets");
+const {
+  getActiveWalletsByAccount, 
+  appendTransactionRow 
+} = require("../services/googleSheets");
 
 // ==============================
 // ✅ SESSION SEMENTARA
@@ -461,25 +464,78 @@ module.exports = (bot) => {
   // ✅ Konfirmasi Simpan
   // ==============================
 
-  bot.action("income_save", async (ctx) => {
-    await ctx.answerCbQuery();
+bot.action("income_save", async (ctx) => {
+  await ctx.answerCbQuery();
 
-    const userKey = getUserSessionKey(ctx);
-    const session = incomeSessions.get(userKey);
+  const userKey = getUserSessionKey(ctx);
+  const session = incomeSessions.get(userKey);
 
-    if (!session || session.flow !== "income" || session.step !== "confirm") {
-      return ctx.reply(
-        "⚠️ Sesi konfirmasi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
-      );
-    }
+  if (!session || session.flow !== "income" || session.step !== "confirm") {
+    return ctx.reply(
+      "⚠️ Sesi konfirmasi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
+    );
+  }
+
+  try {
+    const now = new Date();
+
+    const timestampInput = now.toISOString();
+    const tanggal = session.transactionDate;
+    const waktu = now.toLocaleTimeString("id-ID", {
+        timeZone: "Asia/Jakarta"
+    });
+
+    const bulan = Number(tanggal.split("-")[1]);
+    const tahun = Number(tanggal.split("-")[2]);
+
+    const rowData = [
+      "", // ID Transaksi
+      timestampInput,
+      tanggal,
+      waktu,
+      ctx.from.first_name || "User",
+      ctx.from.id,
+      session.account,
+      "Pemasukan",
+      session.nominal,
+      session.nominalInput,
+      session.category,
+      "", // Dompet Sumber
+      session.wallet,
+      "", // Biaya Admin
+      "", // Dompet Biaya Admin
+      session.description || "-",
+      "", // Periode Minggu
+      bulan,
+      tahun,
+      "Aktif",
+      "", // Referensi
+      "", // Ref Tagihan
+      "", // Periode
+      "Telegram Bot",
+      "", // Link bukti
+      "Input manual via bot",
+    ];
+
+    await appendTransactionRow(rowData);
+
+    // ✅ clear session
+    incomeSessions.delete(userKey);
 
     return ctx.reply(
-      `✅ Data pemasukan sudah siap disimpan.\n\n` +
-        `${buildFinalIncomeSummary(session)}\n\n` +
-        `Catatan:\n` +
-        `Penyimpanan ke Google Sheet akan kita aktifkan di Step 4F.`
+      "✅ Pemasukan berhasil disimpan ke Google Sheet.\n\n" +
+      `💰 ${formatRupiah(session.nominal)} masuk ke ${session.wallet}`
     );
-  });
+
+  } catch (error) {
+    console.error("Error simpan transaksi:", error);
+
+    return ctx.reply(
+      "⚠️ Gagal menyimpan transaksi ke Google Sheet.\nSilakan coba lagi."
+    );
+  }
+});
+
 
   // ==============================
   // ✅ Edit Ulang
