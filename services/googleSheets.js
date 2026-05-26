@@ -9,7 +9,7 @@ function getGoogleAuth() {
   return new google.auth.JWT({
     email: env.GOOGLE_CLIENT_EMAIL,
     key: env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 }
 
