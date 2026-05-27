@@ -7,6 +7,7 @@ const lastHandler = require("../handlers/last");
 const incomeHandler = require("../handlers/income");
 const expenseHandler = require("../handlers/expense"); // ✅ jangan langsung panggil
 const transferHandler = require("../handlers/transfer");
+const saldoHandler = require("../handlers/saldo");
 
 let bot = null;
 
@@ -36,6 +37,7 @@ if (env.BOT_TOKEN) {
   incomeHandler(bot);
   expenseHandler(bot); // ✅ WAJIB ADA
   transferHandler(bot);
+  saldoHandler(bot);
 }
 
 module.exports = bot;
