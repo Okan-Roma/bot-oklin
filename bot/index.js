@@ -6,6 +6,7 @@ const pingHandler = require("../handlers/ping");
 const lastHandler = require("../handlers/last");
 const incomeHandler = require("../handlers/income");
 const expenseHandler = require("../handlers/expense"); // ✅ jangan langsung panggil
+const transferHandler = require("../handlers/transfer");
 
 let bot = null;
 
@@ -23,6 +24,7 @@ if (env.BOT_TOKEN) {
         [
           Markup.button.callback("➕ Pemasukan", "menu_income"),
           Markup.button.callback("➖ Pengeluaran", "menu_expense"),
+          Markup.button.callback("🔁 Transfer Dompet", "menu_transfer"),
         ],
       ])
     );
@@ -33,6 +35,7 @@ if (env.BOT_TOKEN) {
   lastHandler(bot);
   incomeHandler(bot);
   expenseHandler(bot); // ✅ WAJIB ADA
+  transferHandler(bot);
 }
 
 module.exports = bot;

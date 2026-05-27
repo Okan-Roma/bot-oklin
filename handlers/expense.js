@@ -280,9 +280,9 @@ function buildDescriptionPrompt(session) {
     `${buildExpenseSummary(session)}\n\n` +
     `Masukkan keterangan transaksi.\n\n` +
     `Contoh:\n` +
-    `Makan siang\n\n` +
-    `Bayar listrik\n\n` +
-    `Beli bensin\n\n` +
+    `Makan siang\n` +
+    `Bayar listrik\n` +
+    `Beli bensin\n` +
     `Jika tidak ada keterangan, ketik:\n` +
     `-`
   );
@@ -458,9 +458,9 @@ module.exports = (bot) => {
         `${buildExpenseSummary(session)}\n\n` +
         `Masukkan keterangan transaksi.\n\n` +
         `Contoh:\n` +
-        `Makan siang\n\n` +
-        `Bayar listrik\n\n` +
-        `Beli bensin\n\n` +
+        `Makan siang\n` +
+        `Bayar listrik\n` +
+        `Beli bensin\n` +
         `Jika tidak ada keterangan, ketik:\n` +
         `-`
     );
