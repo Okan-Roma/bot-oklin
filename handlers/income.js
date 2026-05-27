@@ -1,6 +1,114 @@
 const { Markup } = require("telegraf");
 const {
-  getActive Date();  getActiveWalletsByAccount,
+  getActiveWalletsByAccount,
+  appendTransactionRow,
+} = require("../services/googleSheets");
+
+// ==============================
+// ✅ SESSION SEMENTARA
+// ==============================
+
+const incomeSessions = new Map();
+
+// ==============================
+// ✅ DATA MASTER
+// ==============================
+
+const ACCOUNTS = ["Oklin", "Mamah", "Isal"];
+
+const INCOME_CATEGORIES = [
+  "Gaji",
+  "Bonus",
+  "Komisi",
+  "Penjualan",
+  "Transfer Masuk",
+  "Refund",
+  "Lainnya",
+];
+
+// ==============================
+// ✅ HELPER NOMINAL
+// ==============================
+
+function parseNominal(input) {
+  if (!input) return null;
+
+  let text = String(input)
+    .trim()
+    .toLowerCase()
+    .replace(/\s/g, "");
+
+  text = text.replace(",", ".");
+
+  let multiplier = 1;
+
+  if (text.endsWith("ribu")) {
+    multiplier = 1000;
+    text = text.replace("ribu", "");
+  } else if (text.endsWith("rb")) {
+    multiplier = 1000;
+    text = text.replace("rb", "");
+  } else if (text.endsWith("k")) {
+    multiplier = 1000;
+    text = text.replace("k", "");
+  } else if (text.endsWith("juta")) {
+    multiplier = 1000000;
+    text = text.replace("juta", "");
+  } else if (text.endsWith("jt")) {
+    multiplier = 1000000;
+    text = text.replace("jt", "");
+  }
+
+  if (multiplier === 1) {
+    text = text.replace(/\./g, "");
+  }
+
+  const number = Number(text);
+
+  if (!number || number <= 0 || Number.isNaN(number)) {
+    return null;
+  }
+
+  return Math.round(number * multiplier);
+}
+
+function formatRupiah(value) {
+  return "Rp " + Number(value || 0).toLocaleString("id-ID");
+}
+
+// ==============================
+// ✅ HELPER TANGGAL WIB
+// ==============================
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function getTodayWIBDateOnly() {
+  const parts = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(new Date());
+
+  const day = Number(parts.find((p) => p.type === "day").value);
+  const month = Number(parts.find((p) => p.type === "month").value);
+  const year = Number(parts.find((p) => p.type === "year").value);
+
+  return new Date(year, month - 1, day);
+}
+
+function formatDateToDDMMYYYY(date) {
+  const day = pad2(date.getDate());
+  const month = pad2(date.getMonth() + 1);
+  const year = date.getFullYear();
+
+  return `${day}-${month}-${year}`;
+}
+
+function getTimestampInputWIB() {
+  const now = new Date();
 
   const datePart = new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
@@ -588,110 +696,3 @@ module.exports = (bot) => {
     return next();
   });
 };
-  appendTransactionRow,
-} = require("../services/googleSheets");
-
-// ==============================
-// ✅ SESSION SEMENTARA
-// ==============================
-
-const incomeSessions = new Map();
-
-// ==============================
-// ✅ DATA MASTER
-// ==============================
-
-const ACCOUNTS = ["Oklin", "Mamah", "Isal"];
-
-const INCOME_CATEGORIES = [
-  "Gaji",
-  "Bonus",
-  "Komisi",
-  "Penjualan",
-  "Transfer Masuk",
-  "Refund",
-  "Lainnya",
-];
-
-// ==============================
-// ✅ HELPER NOMINAL
-// ==============================
-
-function parseNominal(input) {
-  if (!input) return null;
-
-  let text = String(input)
-    .trim()
-    .toLowerCase()
-    .replace(/\s/g, "");
-
-  text = text.replace(",", ".");
-
-  let multiplier = 1;
-
-  if (text.endsWith("ribu")) {
-    multiplier = 1000;
-    text = text.replace("ribu", "");
-  } else if (text.endsWith("rb")) {
-    multiplier = 1000;
-    text = text.replace("rb", "");
-  } else if (text.endsWith("k")) {
-    multiplier = 1000;
-    text = text.replace("k", "");
-  } else if (text.endsWith("juta")) {
-    multiplier = 1000000;
-    text = text.replace("juta", "");
-  } else if (text.endsWith("jt")) {
-    multiplier = 1000000;
-    text = text.replace("jt", "");
-  }
-
-  if (multiplier === 1) {
-    text = text.replace(/\./g, "");
-  }
-
-  const number = Number(text);
-
-  if (!number || number <= 0 || Number.isNaN(number)) {
-    return null;
-  }
-
-  return Math.round(number * multiplier);
-}
-
-function formatRupiah(value) {
-  return "Rp " + Number(value || 0).toLocaleString("id-ID");
-}
-
-// ==============================
-// ✅ HELPER TANGGAL WIB
-// ==============================
-
-function pad2(value) {
-  return String(value).padStart(2, "0");
-}
-
-function getTodayWIBDateOnly() {
-  const parts = new Intl.DateTimeFormat("id-ID", {
-    timeZone: "Asia/Jakarta",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).formatToParts(new Date());
-
-  const day = Number(parts.find((p) => p.type === "day").value);
-  const month = Number(parts.find((p) => p.type === "month").value);
-  const year = Number(parts.find((p) => p.type === "year").value);
-
-  return new Date(year, month - 1, day);
-}
-
-function formatDateToDDMMYYYY(date) {
-  const day = pad2(date.getDate());
-  const month = pad2(date.getMonth() + 1);
-  const year = date.getFullYear();
-
-  return `${day}-${month}-${year}`;
-}
-
-function getTimestampInputWIB() {
