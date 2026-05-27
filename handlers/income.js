@@ -1,110 +1,35 @@
 const { Markup } = require("telegraf");
 const {
-  getActiveWalletsByAccount, 
-  appendTransactionRow 
-} = require("../services/googleSheets");
+  getActive Date();  getActiveWalletsByAccount,
 
-// ==============================
-// ✅ SESSION SEMENTARA
-// ==============================
-
-const incomeSessions = new Map();
-
-// ==============================
-// ✅ DATA MASTER
-// ==============================
-
-const ACCOUNTS = ["Oklin", "Mamah", "Isal"];
-
-const INCOME_CATEGORIES = [
-  "Gaji",
-  "Bonus",
-  "Komisi",
-  "Penjualan",
-  "Transfer Masuk",
-  "Refund",
-  "Lainnya",
-];
-
-// ==============================
-// ✅ HELPER NOMINAL
-// ==============================
-
-function parseNominal(input) {
-  if (!input) return null;
-
-  let text = String(input)
-    .trim()
-    .toLowerCase()
-    .replace(/\s/g, "");
-
-  text = text.replace(",", ".");
-
-  let multiplier = 1;
-
-  if (text.endsWith("ribu")) {
-    multiplier = 1000;
-    text = text.replace("ribu", "");
-  } else if (text.endsWith("rb")) {
-    multiplier = 1000;
-    text = text.replace("rb", "");
-  } else if (text.endsWith("k")) {
-    multiplier = 1000;
-    text = text.replace("k", "");
-  } else if (text.endsWith("juta")) {
-    multiplier = 1000000;
-    text = text.replace("juta", "");
-  } else if (text.endsWith("jt")) {
-    multiplier = 1000000;
-    text = text.replace("jt", "");
-  }
-
-  if (multiplier === 1) {
-    text = text.replace(/\./g, "");
-  }
-
-  const number = Number(text);
-
-  if (!number || number <= 0 || Number.isNaN(number)) {
-    return null;
-  }
-
-  return Math.round(number * multiplier);
-}
-
-function formatRupiah(value) {
-  return "Rp " + Number(value || 0).toLocaleString("id-ID");
-}
-
-// ==============================
-// ✅ HELPER TANGGAL WIB
-// ==============================
-
-function pad2(value) {
-  return String(value).padStart(2, "0");
-}
-
-function getTodayWIBDateOnly() {
-  const parts = new Intl.DateTimeFormat("id-ID", {
+  const datePart = new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  }).formatToParts(new Date());
+  })
+    .format(now)
+    .replace(/\//g, "-");
 
-  const day = Number(parts.find((p) => p.type === "day").value);
-  const month = Number(parts.find((p) => p.type === "month").value);
-  const year = Number(parts.find((p) => p.type === "year").value);
+  const timePart = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(now);
 
-  return new Date(year, month - 1, day);
+  return `${datePart} ${timePart}`;
 }
 
-function formatDateToDDMMYYYY(date) {
-  const day = pad2(date.getDate());
-  const month = pad2(date.getMonth() + 1);
-  const year = date.getFullYear();
-
-  return `${day}-${month}-${year}`;
+function getTimeWIB() {
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date());
 }
 
 function parseManualDate(input) {
@@ -464,78 +389,71 @@ module.exports = (bot) => {
   // ✅ Konfirmasi Simpan
   // ==============================
 
-bot.action("income_save", async (ctx) => {
-  await ctx.answerCbQuery();
+  bot.action("income_save", async (ctx) => {
+    await ctx.answerCbQuery();
 
-  const userKey = getUserSessionKey(ctx);
-  const session = incomeSessions.get(userKey);
+    const userKey = getUserSessionKey(ctx);
+    const session = incomeSessions.get(userKey);
 
-  if (!session || session.flow !== "income" || session.step !== "confirm") {
-    return ctx.reply(
-      "⚠️ Sesi konfirmasi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
-    );
-  }
+    if (!session || session.flow !== "income" || session.step !== "confirm") {
+      return ctx.reply(
+        "⚠️ Sesi konfirmasi pemasukan tidak ditemukan.\nSilakan mulai lagi dari menu ➕ Pemasukan."
+      );
+    }
 
-  try {
-    const now = new Date();
+    try {
+      const timestampInput = getTimestampInputWIB();
+      const tanggal = session.transactionDate;
+      const waktu = getTimeWIB();
 
-    const timestampInput = now.toISOString();
-    const tanggal = session.transactionDate;
-    const waktu = now.toLocaleTimeString("id-ID", {
-        timeZone: "Asia/Jakarta"
-    });
+      const bulan = Number(tanggal.split("-")[1]);
+      const tahun = Number(tanggal.split("-")[2]);
 
-    const bulan = Number(tanggal.split("-")[1]);
-    const tahun = Number(tanggal.split("-")[2]);
+      const rowData = [
+        "", // ID Transaksi
+        timestampInput,
+        tanggal,
+        waktu,
+        ctx.from.first_name || "User",
+        ctx.from.id,
+        session.account,
+        "Pemasukan",
+        session.nominal,
+        session.nominalInput,
+        session.category,
+        "", // Dompet Sumber
+        session.wallet,
+        "", // Biaya Admin
+        "", // Dompet Biaya Admin
+        session.description || "-",
+        "", // Periode Minggu
+        bulan,
+        tahun,
+        "Aktif",
+        "", // Referensi ID
+        "", // Referensi Tagihan
+        "", // Periode Tagihan
+        "Telegram Bot",
+        "", // Link Bukti
+        "Input manual via bot",
+      ];
 
-    const rowData = [
-      "", // ID Transaksi
-      timestampInput,
-      tanggal,
-      waktu,
-      ctx.from.first_name || "User",
-      ctx.from.id,
-      session.account,
-      "Pemasukan",
-      session.nominal,
-      session.nominalInput,
-      session.category,
-      "", // Dompet Sumber
-      session.wallet,
-      "", // Biaya Admin
-      "", // Dompet Biaya Admin
-      session.description || "-",
-      "", // Periode Minggu
-      bulan,
-      tahun,
-      "Aktif",
-      "", // Referensi
-      "", // Ref Tagihan
-      "", // Periode
-      "Telegram Bot",
-      "", // Link bukti
-      "Input manual via bot",
-    ];
+      await appendTransactionRow(rowData);
 
-    await appendTransactionRow(rowData);
+      incomeSessions.delete(userKey);
 
-    // ✅ clear session
-    incomeSessions.delete(userKey);
+      return ctx.reply(
+        "✅ Pemasukan berhasil disimpan ke Google Sheet.\n\n" +
+          `💰 ${formatRupiah(session.nominal)} masuk ke ${session.wallet}`
+      );
+    } catch (error) {
+      console.error("Error simpan transaksi:", error);
 
-    return ctx.reply(
-      "✅ Pemasukan berhasil disimpan ke Google Sheet.\n\n" +
-      `💰 ${formatRupiah(session.nominal)} masuk ke ${session.wallet}`
-    );
-
-  } catch (error) {
-    console.error("Error simpan transaksi:", error);
-
-    return ctx.reply(
-      "⚠️ Gagal menyimpan transaksi ke Google Sheet.\nSilakan coba lagi."
-    );
-  }
-});
-
+      return ctx.reply(
+        "⚠️ Gagal menyimpan transaksi ke Google Sheet.\nSilakan coba lagi."
+      );
+    }
+  });
 
   // ==============================
   // ✅ Edit Ulang
@@ -670,3 +588,110 @@ bot.action("income_save", async (ctx) => {
     return next();
   });
 };
+  appendTransactionRow,
+} = require("../services/googleSheets");
+
+// ==============================
+// ✅ SESSION SEMENTARA
+// ==============================
+
+const incomeSessions = new Map();
+
+// ==============================
+// ✅ DATA MASTER
+// ==============================
+
+const ACCOUNTS = ["Oklin", "Mamah", "Isal"];
+
+const INCOME_CATEGORIES = [
+  "Gaji",
+  "Bonus",
+  "Komisi",
+  "Penjualan",
+  "Transfer Masuk",
+  "Refund",
+  "Lainnya",
+];
+
+// ==============================
+// ✅ HELPER NOMINAL
+// ==============================
+
+function parseNominal(input) {
+  if (!input) return null;
+
+  let text = String(input)
+    .trim()
+    .toLowerCase()
+    .replace(/\s/g, "");
+
+  text = text.replace(",", ".");
+
+  let multiplier = 1;
+
+  if (text.endsWith("ribu")) {
+    multiplier = 1000;
+    text = text.replace("ribu", "");
+  } else if (text.endsWith("rb")) {
+    multiplier = 1000;
+    text = text.replace("rb", "");
+  } else if (text.endsWith("k")) {
+    multiplier = 1000;
+    text = text.replace("k", "");
+  } else if (text.endsWith("juta")) {
+    multiplier = 1000000;
+    text = text.replace("juta", "");
+  } else if (text.endsWith("jt")) {
+    multiplier = 1000000;
+    text = text.replace("jt", "");
+  }
+
+  if (multiplier === 1) {
+    text = text.replace(/\./g, "");
+  }
+
+  const number = Number(text);
+
+  if (!number || number <= 0 || Number.isNaN(number)) {
+    return null;
+  }
+
+  return Math.round(number * multiplier);
+}
+
+function formatRupiah(value) {
+  return "Rp " + Number(value || 0).toLocaleString("id-ID");
+}
+
+// ==============================
+// ✅ HELPER TANGGAL WIB
+// ==============================
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function getTodayWIBDateOnly() {
+  const parts = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(new Date());
+
+  const day = Number(parts.find((p) => p.type === "day").value);
+  const month = Number(parts.find((p) => p.type === "month").value);
+  const year = Number(parts.find((p) => p.type === "year").value);
+
+  return new Date(year, month - 1, day);
+}
+
+function formatDateToDDMMYYYY(date) {
+  const day = pad2(date.getDate());
+  const month = pad2(date.getMonth() + 1);
+  const year = date.getFullYear();
+
+  return `${day}-${month}-${year}`;
+}
+
+function getTimestampInputWIB() {
