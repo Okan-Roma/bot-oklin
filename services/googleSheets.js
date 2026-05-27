@@ -1,6 +1,10 @@
 const { google } = require("googleapis");
 const env = require("../config/env");
 
+// ==============================
+// ✅ GOOGLE AUTH
+// ==============================
+
 function getGoogleAuth() {
   if (!env.GOOGLE_CLIENT_EMAIL || !env.GOOGLE_PRIVATE_KEY) {
     throw new Error("Google credentials belum lengkap.");
@@ -26,6 +30,11 @@ async function getSheetsClient() {
     auth,
   });
 }
+
+// ==============================
+// ✅ READ SHEET AS OBJECT ROWS
+// Dipakai untuk /last dan Dompet
+// ==============================
 
 async function getSheetRows(sheetName, range = "A:Z") {
   const sheets = await getSheetsClient();
@@ -55,6 +64,26 @@ async function getSheetRows(sheetName, range = "A:Z") {
   });
 }
 
+// ==============================
+// ✅ READ SHEET AS RAW ARRAY ROWS
+// Dipakai untuk /saldo
+// ==============================
+
+async function getAllTransactions() {
+  const sheets = await getSheetsClient();
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: "Transaksi!A2:Z",
+  });
+
+  return response.data.values || [];
+}
+
+// ==============================
+// ✅ TRANSAKSI
+// ==============================
+
 async function getTransactionRows() {
   return getSheetRows("Transaksi", "A:Z");
 }
@@ -70,30 +99,6 @@ async function getLastActiveTransactions(limit = 5) {
   return activeRows.slice(-limit).reverse();
 }
 
-async function getActiveWalletsByAccount(account) {
-  const rows = await getSheetRows("Dompet", "A:G");
-
-  return rows
-    .filter((item) => {
-      const itemAccount = (item["Account"] || "").toString().trim().toLowerCase();
-      const status = (item["Status"] || "").toString().trim().toLowerCase();
-
-      return itemAccount === account.toLowerCase() && status === "aktif";
-    })
-    .sort((a, b) => {
-      const urutanA = Number(a["Urutan"] || 999);
-      const urutanB = Number(b["Urutan"] || 999);
-      return urutanA - urutanB;
-    })
-    .map((item) => item["Nama Dompet"]);
-}
-
-module.exports = {
-  getLastActiveTransactions,
-  getActiveWalletsByAccount,
-  appendTransactionRow,
-};
-
 async function appendTransactionRow(rowData) {
   const sheets = await getSheetsClient();
 
@@ -106,3 +111,43 @@ async function appendTransactionRow(rowData) {
     },
   });
 }
+
+// ==============================
+// ✅ DOMPET
+// ==============================
+
+async function getActiveWalletsByAccount(account) {
+  const rows = await getSheetRows("Dompet", "A:G");
+
+  return rows
+    .filter((item) => {
+      const itemAccount = (item["Account"] || "")
+        .toString()
+        .trim()
+        .toLowerCase();
+
+      const status = (item["Status"] || "")
+        .toString()
+        .trim()
+        .toLowerCase();
+
+      return itemAccount === account.toLowerCase() && status === "aktif";
+    })
+    .sort((a, b) => {
+      const urutanA = Number(a["Urutan"] || 999);
+      const urutanB = Number(b["Urutan"] || 999);
+      return urutanA - urutanB;
+    })
+    .map((item) => item["Nama Dompet"]);
+}
+
+// ==============================
+// ✅ EXPORT
+// ==============================
+
+module.exports = {
+  getAllTransactions,
+  getLastActiveTransactions,
+  getActiveWalletsByAccount,
+  appendTransactionRow,
+};
