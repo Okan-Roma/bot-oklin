@@ -23,28 +23,92 @@ const ACCOUNTS = ["Oklin", "Mamah", "Isal"];
 function parseNominal(input) {
   if (!input) return null;
 
-  let text = String(input).trim().toLowerCase().replace(/\s/g, "");
+  let text = String(input)
+    .trim()
+    .toLowerCase()
+    .replace(/\s/g, "");
+
   text = text.replace(",", ".");
 
   let multiplier = 1;
 
-  if (text.endsWith("rb") || text.endsWith("k")) {
+  if (text.endsWith("ribu")) {
     multiplier = 1000;
-    text = text.replace(/rb|k/, "");
+    text = text.replace("ribu", "");
+  } else if (text.endsWith("rb")) {
+    multiplier = 1000;
+    text = text.replace("rb", "");
+  } else if (text.endsWith("k")) {
+    multiplier = 1000;
+    text = text.replace("k", "");
+  } else if (text.endsWith("juta")) {
+    multiplier = 1000000;
+    text = text.replace("juta", "");
   } else if (text.endsWith("jt")) {
     multiplier = 1000000;
     text = text.replace("jt", "");
   }
 
+  // kalau bukan format singkatan → hapus titik ribuan
+  if (multiplier === 1) {
+    text = text.replace(/\./g, "");
+  }
+
   const number = Number(text);
 
-  if (!number || number <= 0) return null;
+  if (!number || number <= 0 || Number.isNaN(number)) {
+    return null;
+  }
 
   return Math.round(number * multiplier);
 }
 
 function formatRupiah(value) {
   return "Rp " + Number(value).toLocaleString("id-ID");
+}
+
+// ==============================
+// ✅ HELPER WIB
+// ==============================
+
+function getTimestampInputWIB() {
+  const now = new Date();
+
+  const datePart = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+    .format(now)
+    .replace(/\//g, "-");
+
+  const timePart = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(now);
+
+  return `${datePart} ${timePart}`;
+}
+
+function getTimeWIB() {
+  return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
+function formatDateToDDMMYYYY(date) {
+  const d = date.getDate().toString().padStart(2, "0");
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const y = date.getFullYear();
+  return `${d}-${m}-${y}`;
 }
 
 // ==============================
@@ -100,6 +164,7 @@ module.exports = (bot) => {
   // ==============================
 
   bot.action(/^transfer_account:(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
     const account = ctx.match[1];
 
     transferSessions.set(String(ctx.from.id), {
@@ -121,6 +186,7 @@ module.exports = (bot) => {
   // ==============================
 
   bot.action(/^transfer_source:(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
     const wallet = ctx.match[1];
 
     const session = transferSessions.get(String(ctx.from.id));
@@ -140,6 +206,7 @@ module.exports = (bot) => {
   // ==============================
 
   bot.action(/^transfer_target:(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
     const wallet = ctx.match[1];
 
     const session = transferSessions.get(String(ctx.from.id));
@@ -171,7 +238,9 @@ module.exports = (bot) => {
       }
 
       session.nominal = nominal;
+      session.nominalInput = ctx.message.text;
       session.step = "confirm";
+
 
       return ctx.reply(
         `🔁 Transfer\n\n` +
@@ -194,46 +263,70 @@ module.exports = (bot) => {
   // ✅ SIMPAN
   // ==============================
 
-  bot.action("transfer_save", async (ctx) => {
-    const session = transferSessions.get(String(ctx.from.id));
+bot.action("transfer_save", async (ctx) => {
+  await ctx.answerCbQuery();
 
-    const row = [
-      "",
-      new Date().toISOString(),
-      "",
-      "",
-      ctx.from.first_name,
-      ctx.from.id,
-      session.account,
-      "Transfer",
-      session.nominal,
-      session.nominal,
-      "Transfer",
-      session.sourceWallet,
-      session.targetWallet,
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "Aktif",
-    ];
+  const session = transferSessions.get(String(ctx.from.id));
 
-    await appendTransactionRow(row);
-
-    transferSessions.delete(String(ctx.from.id));
-
+  if (!session || session.flow !== "transfer" || session.step !== "confirm") {
     return ctx.reply(
-      `✅ Transfer berhasil\n\n${session.sourceWallet} ➜ ${session.targetWallet}\n${formatRupiah(session.nominal)}`
+      "⚠️ Sesi transfer tidak ditemukan.\nSilakan mulai lagi dari menu 🔁 Transfer Dompet."
     );
-  });
+  }
+
+  const timestampInput = getTimestampInputWIB();
+  const waktu = getTimeWIB();
+  const tanggal = formatDateToDDMMYYYY(new Date());
+
+  const bulan = Number(tanggal.split("-")[1]);
+  const tahun = Number(tanggal.split("-")[2]);
+
+  const row = [
+    "", // ID Transaksi
+    timestampInput,
+    tanggal,
+    waktu,
+    ctx.from.first_name || "User",
+    ctx.from.id,
+    session.account,
+    "Transfer",
+    session.nominal,
+    session.nominalInput || session.nominal,
+    "Transfer",
+    session.sourceWallet,
+    session.targetWallet,
+    "", // Biaya Admin
+    "", // Dompet Biaya Admin
+    session.description || "-",
+    "", // Periode Minggu
+    bulan,
+    tahun,
+    "Aktif",
+    "", // Referensi ID
+    "", // Referensi Tagihan
+    "", // Periode Tagihan
+    "Telegram Bot",
+    "", // Link Bukti
+    "Transfer antar dompet",
+  ];
+
+  await appendTransactionRow(row);
+
+  transferSessions.delete(String(ctx.from.id));
+
+  return ctx.reply(
+    `✅ Transfer berhasil\n\n` +
+      `${session.sourceWallet} ➜ ${session.targetWallet}\n` +
+      `${formatRupiah(session.nominal)}`
+  );
+});
 
   // ==============================
   // ✅ CANCEL
   // ==============================
 
   bot.action("transfer_cancel", async (ctx) => {
+    await ctx.answerCbQuery();
     transferSessions.delete(String(ctx.from.id));
     return ctx.reply("❌ Transfer dibatalkan.");
   });
