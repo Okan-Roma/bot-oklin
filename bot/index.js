@@ -8,6 +8,8 @@ const incomeHandler = require("../handlers/income");
 const expenseHandler = require("../handlers/expense"); // ✅ jangan langsung panggil
 const transferHandler = require("../handlers/transfer");
 const saldoHandler = require("../handlers/saldo");
+const rekapHandler = require("../handlers/rekap");
+
 
 let bot = null;
 
@@ -25,7 +27,10 @@ if (env.BOT_TOKEN) {
         [
           Markup.button.callback("➕ Pemasukan", "menu_income"),
           Markup.button.callback("➖ Pengeluaran", "menu_expense"),
+        ],
+        [
           Markup.button.callback("🔁 Transfer Dompet", "menu_transfer"),
+          Markup.button.callback("📊 Rekap", "menu_recap"),
         ],
       ])
     );
@@ -38,6 +43,7 @@ if (env.BOT_TOKEN) {
   expenseHandler(bot); // ✅ WAJIB ADA
   transferHandler(bot);
   saldoHandler(bot);
+  rekapHandler(bot);
 }
 
 module.exports = bot;
