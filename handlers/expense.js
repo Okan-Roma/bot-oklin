@@ -4,6 +4,12 @@ const {
   appendTransactionRow,
 } = require("../services/googleSheets");
 
+const {
+  setActiveFlow,
+  registerSessionClearer,
+  clearUserSession,
+} = require("../services/sessionManager");
+
 // ==============================
 // ✅ SESSION SEMENTARA
 // ==============================
@@ -307,6 +313,10 @@ function buildFinalExpenseSummary(session) {
 // ==============================
 
 module.exports = (bot) => {
+  registerSessionClearer("expense", (userId) => {
+    expenseSessions.delete(String(userId));
+  });
+
   // ==============================
   // ✅ Klik tombol ➕ Pengeluaran
   // ==============================
@@ -336,6 +346,8 @@ module.exports = (bot) => {
 
     const account = ctx.match[1];
     const userKey = getUserSessionKey(ctx);
+
+    setActiveFlow(ctx.from.id, "expense");
 
     expenseSessions.set(userKey, {
       flow: "expense",
@@ -552,7 +564,7 @@ module.exports = (bot) => {
 
       await appendTransactionRow(rowData);
 
-      expenseSessions.delete(userKey);
+      clearUserSession(ctx.from.id);
 
       return ctx.reply(
         "✅ Pengeluaran berhasil disimpan ke Google Sheet.\n\n" +
@@ -575,7 +587,7 @@ module.exports = (bot) => {
     await ctx.answerCbQuery();
 
     const userKey = getUserSessionKey(ctx);
-    expenseSessions.delete(userKey);
+    clearUserSession(ctx.from.id);
 
     return ctx.reply(
       "✏️ Input Pengeluaran diulang.\n\n" +
@@ -591,7 +603,7 @@ module.exports = (bot) => {
     await ctx.answerCbQuery();
 
     const userKey = getUserSessionKey(ctx);
-    expenseSessions.delete(userKey);
+    clearUserSession(ctx.from.id);
 
     return ctx.reply("❌ Input Pengeluaran dibatalkan.");
   });

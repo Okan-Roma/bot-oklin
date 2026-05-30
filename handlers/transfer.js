@@ -4,6 +4,12 @@ const {
   appendTransactionRow,
 } = require("../services/googleSheets");
 
+const {
+  setActiveFlow,
+  registerSessionClearer,
+  clearUserSession,
+} = require("../services/sessionManager");
+
 // ==============================
 // ✅ SESSION
 // ==============================
@@ -138,6 +144,9 @@ function buildWalletKeyboard(wallets, type) {
 // ==============================
 
 module.exports = (bot) => {
+  registerSessionClearer("transfer", (userId) => {
+    transferSessions.delete(String(userId));
+  });
 
   // ==============================
   // ✅ MENU TRANSFER
@@ -167,6 +176,8 @@ module.exports = (bot) => {
     await ctx.answerCbQuery();
     const account = ctx.match[1];
 
+    setActiveFlow(ctx.from.id, "transfer");
+
     transferSessions.set(String(ctx.from.id), {
       flow: "transfer",
       step: "source",
@@ -190,7 +201,15 @@ module.exports = (bot) => {
     const wallet = ctx.match[1];
 
     const session = transferSessions.get(String(ctx.from.id));
+
+    if (!session || session.flow !== "transfer") {
+      return ctx.reply(
+        "⚠️ Sesi transfer tidak ditemukan.\nSilakan mulai lagi dari menu 🔁 Transfer."
+      );
+    }
+
     session.sourceWallet = wallet;
+
     session.step = "target";
 
     const wallets = await getActiveWalletsByAccount(session.account);
@@ -210,8 +229,13 @@ module.exports = (bot) => {
     const wallet = ctx.match[1];
 
     const session = transferSessions.get(String(ctx.from.id));
+    if (!session || session.flow !== "transfer") {
+        return ctx.reply(
+          "⚠️ Sesi transfer tidak ditemukan.\nSilakan mulai lagi dari menu 🔁 Transfer."
+        );
+    }
 
-    if (wallet === session.sourceWallet) {
+if (wallet === session.sourceWallet) {
       return ctx.reply("⚠️ Dompet tidak boleh sama");
     }
 
@@ -312,7 +336,7 @@ bot.action("transfer_save", async (ctx) => {
 
   await appendTransactionRow(row);
 
-  transferSessions.delete(String(ctx.from.id));
+  clearUserSession(ctx.from.id);
 
   return ctx.reply(
     `✅ Transfer berhasil\n\n` +
@@ -327,7 +351,7 @@ bot.action("transfer_save", async (ctx) => {
 
   bot.action("transfer_cancel", async (ctx) => {
     await ctx.answerCbQuery();
-    transferSessions.delete(String(ctx.from.id));
+    clearUserSession(ctx.from.id);
     return ctx.reply("❌ Transfer dibatalkan.");
   });
 
