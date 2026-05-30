@@ -33,7 +33,7 @@ async function getSheetsClient() {
 
 // ==============================
 // ✅ READ SHEET AS OBJECT ROWS
-// Dipakai untuk /last dan Dompet
+// Dipakai untuk /last, Dompet, Saldo_Awal
 // ==============================
 
 async function getSheetRows(sheetName, range = "A:Z") {
@@ -92,7 +92,11 @@ async function getLastActiveTransactions(limit = 5) {
   const rows = await getTransactionRows();
 
   const activeRows = rows.filter((item) => {
-    const status = (item["Status"] || "").toString().trim().toLowerCase();
+    const status = (item["Status"] || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+
     return status === "aktif";
   });
 
@@ -142,6 +146,23 @@ async function getActiveWalletsByAccount(account) {
 }
 
 // ==============================
+// ✅ SALDO AWAL
+// ==============================
+
+async function getActiveInitialBalances() {
+  const rows = await getSheetRows("Saldo_Awal", "A:F");
+
+  return rows.filter((item) => {
+    const status = (item["Status"] || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    return status === "aktif";
+  });
+}
+
+// ==============================
 // ✅ EXPORT
 // ==============================
 
@@ -149,5 +170,6 @@ module.exports = {
   getAllTransactions,
   getLastActiveTransactions,
   getActiveWalletsByAccount,
+  getActiveInitialBalances,
   appendTransactionRow,
 };
