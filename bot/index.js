@@ -9,6 +9,7 @@ const expenseHandler = require("../handlers/expense");
 const transferHandler = require("../handlers/transfer");
 const saldoHandler = require("../handlers/saldo");
 const rekapHandler = require("../handlers/rekap");
+const riwayatHandler = require("../handlers/riwayat");
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
 let bot = null;
@@ -53,6 +54,7 @@ if (env.BOT_TOKEN) {
 
   saldoHandler(bot);
   rekapHandler(bot);
+  riwayatHandler(bot);
 }
 
 module.exports = bot;
