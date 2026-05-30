@@ -104,7 +104,7 @@ function parseTransactionDate(dateText) {
     };
   }
 
-  // Format Google Sheet kadang: DD/MM/YYYY
+  // Format Google Sheet: DD/MM/YYYY
   match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
 
   if (match) {
@@ -154,7 +154,7 @@ function buildRiwayatMessage(transactions) {
   if (!transactions.length) {
     return (
       `📜 Riwayat Transaksi\n\n` +
-      `Periode: ${getMonthName(month)} ${year}\n\n` +
+      `Periode : ${getMonthName(month)} ${year}\n\n` +
       `⚠️ Belum ada transaksi aktif pada bulan ini.`
     );
   }
@@ -187,28 +187,33 @@ function buildRiwayatMessage(transactions) {
   return message.trim();
 }
 
+async function sendRiwayat(ctx) {
+  const rows = await getAllTransactions();
+
+  if (!rows || !rows.length) {
+    return ctx.reply("⚠️ Belum ada data transaksi.");
+  }
+
+  const transactions = rows
+    .map(normalizeTransaction)
+    .filter((trx) => {
+      return trx.status === "aktif" && isThisMonth(trx.tanggal);
+    })
+    .slice(-10)
+    .reverse();
+
+  return ctx.reply(buildRiwayatMessage(transactions));
+}
+
 // ==============================
 // ✅ HANDLER RIWAYAT
 // ==============================
 
 module.exports = (bot) => {
+  // Command utama
   bot.command("riwayat", async (ctx) => {
     try {
-      const rows = await getAllTransactions();
-
-      if (!rows || !rows.length) {
-        return ctx.reply("⚠️ Belum ada data transaksi.");
-      }
-
-      const transactions = rows
-        .map(normalizeTransaction)
-        .filter((trx) => {
-          return trx.status === "aktif" && isThisMonth(trx.tanggal);
-        })
-        .slice(-10)
-        .reverse();
-
-      return ctx.reply(buildRiwayatMessage(transactions));
+      return await sendRiwayat(ctx);
     } catch (error) {
       console.error("Error /riwayat:", error);
 
@@ -218,28 +223,40 @@ module.exports = (bot) => {
     }
   });
 
-  // Kalau nanti ada tombol 📜 Riwayat di menu utama
+  // Inline button dari menu utama
   bot.action("menu_history", async (ctx) => {
     await ctx.answerCbQuery();
 
     try {
-      const rows = await getAllTransactions();
-
-      if (!rows || !rows.length) {
-        return ctx.reply("⚠️ Belum ada data transaksi.");
-      }
-
-      const transactions = rows
-        .map(normalizeTransaction)
-        .filter((trx) => {
-          return trx.status === "aktif" && isThisMonth(trx.tanggal);
-        })
-        .slice(-10)
-        .reverse();
-
-      return ctx.reply(buildRiwayatMessage(transactions));
+      return await sendRiwayat(ctx);
     } catch (error) {
       console.error("Error menu_history:", error);
+
+      return ctx.reply(
+        "⚠️ Gagal mengambil riwayat transaksi.\nSilakan coba lagi beberapa saat."
+      );
+    }
+  });
+
+  // Reply keyboard text: "📜 Riwayat"
+  bot.hears("📜 Riwayat", async (ctx) => {
+    try {
+      return await sendRiwayat(ctx);
+    } catch (error) {
+      console.error("Error hears 📜 Riwayat:", error);
+
+      return ctx.reply(
+        "⚠️ Gagal mengambil riwayat transaksi.\nSilakan coba lagi beberapa saat."
+      );
+    }
+  });
+
+  // Kalau tombol keyboard kamu cuma bertuliskan "Riwayat"
+  bot.hears("Riwayat", async (ctx) => {
+    try {
+      return await sendRiwayat(ctx);
+    } catch (error) {
+      console.error("Error hears Riwayat:", error);
 
       return ctx.reply(
         "⚠️ Gagal mengambil riwayat transaksi.\nSilakan coba lagi beberapa saat."
