@@ -308,7 +308,7 @@ bot.action("transfer_save", async (ctx) => {
   const tahun = Number(tanggal.split("-")[2]);
 
   const row = [
-    "", // ID Transaksi
+    transactionId, // ID Transaksi
     timestampInput,
     tanggal,
     waktu,
@@ -333,7 +333,7 @@ bot.action("transfer_save", async (ctx) => {
     "", // Periode Tagihan
     "Telegram Bot",
     "", // Link Bukti
-    "Transfer antar dompet",
+    "Input via Menu Bot - Transfer",
   ];
 
   await appendTransactionRow(row);

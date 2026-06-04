@@ -537,7 +537,7 @@ module.exports = (bot) => {
       const tahun = Number(tanggal.split("-")[2]);
 
       const rowData = [
-        "", // ID Transaksi
+        transactionId, // ID Transaksi
         timestampInput,
         tanggal,
         waktu,
@@ -562,7 +562,7 @@ module.exports = (bot) => {
         "", // Periode Tagihan
         "Telegram Bot",
         "", // Link Bukti
-        "Input manual via bot",
+        "Input via Menu Bot - Pengeluaran",
       ];
 
       await appendTransactionRow(rowData);
