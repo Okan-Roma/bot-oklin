@@ -20,6 +20,7 @@ function buildHelpMessage() {
     `/last - 5 transaksi terakhir\n` +
     `/detail T2 - detail transaksi berdasarkan ID\n` +
     `/hapus T2 - hapus transaksi berdasarkan ID\n` +
+    `/restore T2 - aktifkan kembali transaksi yang dihapus\n` +
     `/riwayat - riwayat transaksi bulan ini\n` +
     `/saldo - saldo dompet\n` +
     `/rekap - rekap bulan ini\n` +
@@ -53,7 +54,11 @@ function buildHelpMessage() {
 
     `Contoh hapus transaksi:\n` +
     `/hapus T2\n` +
-    `/hapus T-0002\n\n` +   
+    `/hapus T-0002\n\n` +
+
+    `Contoh restore transaksi:\n` +
+    `/restore T2\n` +
+    `/restore T-0002\n\n` +
 
     `⚠️ Catatan:\n` +
     `Jika sedang mengisi transaksi, selesaikan dulu atau tekan ❌ Batal sebelum membuka menu lain.`

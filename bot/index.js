@@ -15,6 +15,7 @@ const verHandler = require("../handlers/ver");
 const detailHandler = require("../handlers/detail");
 const fastInputHandler = require("../handlers/fastInput");
 const hapusHandler = require("../handlers/hapus");
+const restoreHandler = require("../handlers/restore");
 
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
@@ -55,6 +56,7 @@ if (env.BOT_TOKEN) {
   verHandler(bot);
   detailHandler(bot);
   hapusHandler(bot);
+  restoreHandler(bot);
 
   // Menu keyboard bawah
   menuHandler(bot);
