@@ -18,6 +18,7 @@ function buildHelpMessage() {
     `/help - bantuan penggunaan bot\n` +
     `/ping - cek status bot dan waktu WIB\n` +
     `/last - 5 transaksi terakhir\n` +
+    `/detail T2 - detail transaksi berdasarkan ID\n` +
     `/riwayat - riwayat transaksi bulan ini\n` +
     `/saldo - saldo dompet\n` +
     `/rekap - rekap bulan ini\n` +
@@ -35,6 +36,10 @@ function buildHelpMessage() {
     `📅 Format tanggal manual:\n` +
     `DD-MM-YYYY\n` +
     `Contoh: 27-05-2026\n\n` +
+
+    `Contoh detail transaksi:\n` +
+    `/detail T2\n` +
+    `/detail T-0002\n\n` +
 
     `⚠️ Catatan:\n` +
     `Jika sedang mengisi transaksi, selesaikan dulu atau tekan ❌ Batal sebelum membuka menu lain.`

@@ -12,6 +12,7 @@ const rekapHandler = require("../handlers/rekap");
 const riwayatHandler = require("../handlers/riwayat");
 const helpHandler = require("../handlers/help");
 const verHandler = require("../handlers/ver");
+const detailHandler = require("../handlers/detail");
 
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
@@ -50,6 +51,7 @@ if (env.BOT_TOKEN) {
   lastHandler(bot);
   helpHandler(bot);
   verHandler(bot);
+  detailHandler(bot);
 
   // Menu keyboard bawah
   menuHandler(bot);
