@@ -214,6 +214,28 @@ async function updateTransactionStatusAndNote(rowNumber, status, systemNote) {
     },
   });
 }
+// ==============================
+// ✅ EDIT
+// ==============================
+
+async function updateTransactionCells(rowNumber, updates) {
+  const sheets = await getSheetsClient();
+
+  const data = Object.entries(updates).map(([column, value]) => {
+    return {
+      range: `Transaksi!${column}${rowNumber}`,
+      values: [[value]],
+    };
+  });
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data,
+    },
+  });
+}
 
 // ==============================
 // ✅ EXPORT
@@ -227,4 +249,5 @@ module.exports = {
   appendTransactionRow,
   generateNextTransactionId,
   updateTransactionStatusAndNote,
+  updateTransactionCells,
 };

@@ -16,6 +16,7 @@ const detailHandler = require("../handlers/detail");
 const fastInputHandler = require("../handlers/fastInput");
 const hapusHandler = require("../handlers/hapus");
 const restoreHandler = require("../handlers/restore");
+const editHandler = require("../handlers/edit");
 
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
@@ -57,6 +58,7 @@ if (env.BOT_TOKEN) {
   detailHandler(bot);
   hapusHandler(bot);
   restoreHandler(bot);
+  editHandler(bot);
 
   // Menu keyboard bawah
   menuHandler(bot);
