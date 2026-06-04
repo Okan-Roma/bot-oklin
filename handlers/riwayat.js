@@ -1,3 +1,4 @@
+const { Markup } = require("telegraf");
 const { getAllTransactions } = require("../services/googleSheets");
 
 // ==============================
@@ -44,17 +45,41 @@ function getDompetText(jenis, sumber, tujuan) {
   return "-";
 }
 
-function getCurrentMonthYearWIB() {
-  const parts = new Intl.DateTimeFormat("id-ID", {
-    timeZone: "Asia/Jakarta",
-    month: "2-digit",
-    year: "numeric",
-  }).formatToParts(new Date());
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
 
-  const month = Number(parts.find((p) => p.type === "month").value);
-  const year = Number(parts.find((p) => p.type === "year").value);
+function formatDateShort(dateText) {
+  if (!dateText) return "-";
 
-  return { month, year };
+  const text = String(dateText).trim();
+
+  // DD-MM-YYYY
+  let match = text.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+
+  if (match) {
+    return `${match[1]}/${match[2]}`;
+  }
+
+  // YYYY-MM-DD
+  match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+  if (match) {
+    return `${match[3]}/${match[2]}`;
+  }
+
+  // DD/MM/YYYY
+  match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+  if (match) {
+    return `${pad2(match[1])}/${pad2(match[2])}`;
+  }
+
+  return text;
+}
+
+function formatDateToDDMMYYYY(date) {
+  return `${pad2(date.getDate())}-${pad2(date.getMonth() + 1)}-${date.getFullYear()}`;
 }
 
 function getMonthName(monthNumber) {
@@ -77,61 +102,162 @@ function getMonthName(monthNumber) {
   return monthNames[monthNumber] || "-";
 }
 
+// ==============================
+// ✅ HELPER DATE WIB
+// ==============================
+
+function getTodayWIBDateOnly() {
+  const parts = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(new Date());
+
+  const day = Number(parts.find((p) => p.type === "day").value);
+  const month = Number(parts.find((p) => p.type === "month").value);
+  const year = Number(parts.find((p) => p.type === "year").value);
+
+  return new Date(year, month - 1, day);
+}
+
+function getCurrentMonthYearWIB() {
+  const today = getTodayWIBDateOnly();
+
+  return {
+    month: today.getMonth() + 1,
+    year: today.getFullYear(),
+  };
+}
+
+function getWeekRangeWIB() {
+  const today = getTodayWIBDateOnly();
+
+  // Minggu di JS = 0, Senin = 1
+  // Kita pakai Senin - Minggu
+  const day = today.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+
+  const start = new Date(today);
+  start.setDate(today.getDate() + diffToMonday);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return { start, end };
+}
+
 function parseTransactionDate(dateText) {
   if (!dateText) return null;
 
   const text = String(dateText).trim();
 
-  // Format baru: DD-MM-YYYY
+  // DD-MM-YYYY
   let match = text.match(/^(\d{2})-(\d{2})-(\d{4})$/);
 
   if (match) {
-    return {
-      day: Number(match[1]),
-      month: Number(match[2]),
-      year: Number(match[3]),
-    };
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
   }
 
-  // Format lama: YYYY-MM-DD
+  // YYYY-MM-DD
   match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
   if (match) {
-    return {
-      day: Number(match[3]),
-      month: Number(match[2]),
-      year: Number(match[1]),
-    };
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
   }
 
-  // Format Google Sheet: DD/MM/YYYY
+  // DD/MM/YYYY
   match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
 
   if (match) {
-    return {
-      day: Number(match[1]),
-      month: Number(match[2]),
-      year: Number(match[3]),
-    };
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
   }
 
   return null;
 }
 
-function isThisMonth(dateText) {
-  const parsedDate = parseTransactionDate(dateText);
+function isDateInPeriod(date, period) {
+  if (!date) return false;
 
-  if (!parsedDate) {
-    return false;
+  const today = getTodayWIBDateOnly();
+
+  if (period === "today") {
+    return date.getTime() === today.getTime();
   }
 
-  const { month, year } = getCurrentMonthYearWIB();
+  if (period === "week") {
+    const { start, end } = getWeekRangeWIB();
+    return date >= start && date <= end;
+  }
 
-  return parsedDate.month === month && parsedDate.year === year;
+  if (period === "month") {
+    const { month, year } = getCurrentMonthYearWIB();
+
+    return date.getMonth() + 1 === month && date.getFullYear() === year;
+  }
+
+  return false;
 }
+
+function getPeriodTitle(period) {
+  const today = getTodayWIBDateOnly();
+
+  if (period === "today") {
+    return `Hari Ini (${formatDateToDDMMYYYY(today)})`;
+  }
+
+  if (period === "week") {
+    const { start, end } = getWeekRangeWIB();
+
+    return `Minggu Ini (${formatDateToDDMMYYYY(start)} s/d ${formatDateToDDMMYYYY(end)})`;
+  }
+
+  if (period === "month") {
+    const { month, year } = getCurrentMonthYearWIB();
+
+    return `${getMonthName(month)} ${year}`;
+  }
+
+  return "-";
+}
+
+// ==============================
+// ✅ KEYBOARD
+// ==============================
+
+function buildRiwayatPeriodKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback("📅 Hari Ini", "history_period:today"),
+      Markup.button.callback("🗓 Minggu Ini", "history_period:week"),
+    ],
+    [Markup.button.callback("📆 Bulan Ini", "history_period:month")],
+    [Markup.button.callback("❌ Batal", "history_cancel")],
+  ]);
+}
+
+function buildRiwayatAccountKeyboard(period) {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback("Semua Account", `history_account:${period}:ALL`)],
+    [
+      Markup.button.callback("Oklin", `history_account:${period}:Oklin`),
+      Markup.button.callback("Mamah", `history_account:${period}:Mamah`),
+    ],
+    [Markup.button.callback("Isal", `history_account:${period}:Isal`)],
+    [
+      Markup.button.callback("⬅️ Kembali", "menu_history"),
+      Markup.button.callback("❌ Batal", "history_cancel"),
+    ],
+  ]);
+}
+
+// ==============================
+// ✅ NORMALIZE DATA
+// ==============================
 
 function normalizeTransaction(row) {
   return {
+    id: row[0] || "-",
     timestampInput: row[1] || "-",
     tanggal: row[2] || "-",
     waktu: row[3] || "-",
@@ -148,72 +274,90 @@ function normalizeTransaction(row) {
   };
 }
 
-function buildRiwayatMessage(transactions) {
-  const { month, year } = getCurrentMonthYearWIB();
+// ==============================
+// ✅ BUILD MESSAGE
+// ==============================
+
+function buildCompactLine(trx, index) {
+  const id = trx.id || "-";
+  const tanggal = formatDateShort(trx.tanggal);
+  const icon = getJenisIcon(trx.jenis);
+  const nominal = formatRupiah(trx.nominal);
+  const dompetText = getDompetText(trx.jenis, trx.dompetSumber, trx.dompetTujuan);
+
+  if (String(trx.jenis).toLowerCase().includes("transfer")) {
+    return `${index + 1}. ${id} | ${tanggal} | ${icon} ${nominal} | ${dompetText}`;
+  }
+
+  return `${index + 1}. ${id} | ${tanggal} | ${icon} ${nominal} | ${trx.kategori} | ${dompetText}`;
+}
+
+function buildRiwayatMessage(transactions, period, selectedAccount) {
+  const accountText = selectedAccount === "ALL" ? "Semua Account" : selectedAccount;
 
   if (!transactions.length) {
     return (
       `📜 Riwayat Transaksi\n\n` +
-      `Periode : ${getMonthName(month)} ${year}\n\n` +
-      `⚠️ Belum ada transaksi aktif pada bulan ini.`
+      `Periode : ${getPeriodTitle(period)}\n` +
+      `Account : ${accountText}\n\n` +
+      `⚠️ Belum ada transaksi aktif pada periode ini.`
     );
   }
 
   let message =
     `📜 Riwayat Transaksi\n\n` +
-    `Periode : ${getMonthName(month)} ${year}\n` +
+    `Periode : ${getPeriodTitle(period)}\n` +
+    `Account : ${accountText}\n` +
     `Jumlah  : ${transactions.length} transaksi terakhir\n` +
     `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
   transactions.forEach((trx, index) => {
-    const icon = getJenisIcon(trx.jenis);
-    const dompetText = getDompetText(
-      trx.jenis,
-      trx.dompetSumber,
-      trx.dompetTujuan
-    );
-
-    message +=
-      `${index + 1}. ${icon} ${trx.jenis}\n` +
-      `🏷 Account : ${trx.account}\n` +
-      `💰 Nominal : ${formatRupiah(trx.nominal)}\n` +
-      `📂 Kategori: ${trx.kategori}\n` +
-      `🏦 Dompet  : ${dompetText}\n` +
-      `📅 Tanggal : ${trx.tanggal}\n` +
-      `📝 Ket     : ${trx.keterangan}\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += buildCompactLine(trx, index) + "\n";
   });
+
+  message += `\nDetail:\nKetik /detail T2`;
 
   return message.trim();
 }
 
-async function sendRiwayat(ctx) {
+async function buildRiwayatFilteredMessage(period = "month", selectedAccount = "ALL") {
   const rows = await getAllTransactions();
 
   if (!rows || !rows.length) {
-    return ctx.reply("⚠️ Belum ada data transaksi.");
+    return "⚠️ Belum ada data transaksi.";
   }
 
   const transactions = rows
     .map(normalizeTransaction)
     .filter((trx) => {
-      return trx.status === "aktif" && isThisMonth(trx.tanggal);
+      if (trx.status !== "aktif") {
+        return false;
+      }
+
+      if (selectedAccount !== "ALL" && trx.account !== selectedAccount) {
+        return false;
+      }
+
+      const parsedDate = parseTransactionDate(trx.tanggal);
+
+      return isDateInPeriod(parsedDate, period);
     })
     .slice(-10)
     .reverse();
 
-  return ctx.reply(buildRiwayatMessage(transactions));
+  return buildRiwayatMessage(transactions, period, selectedAccount);
 }
 
 // ==============================
-// ✅ HANDLER RIWAYAT
+// ✅ HANDLER
 // ==============================
 
 module.exports = (bot) => {
-  // Command utama
+  // /riwayat = Bulan Ini + Semua Account
   bot.command("riwayat", async (ctx) => {
     try {
-      return await sendRiwayat(ctx);
+      const message = await buildRiwayatFilteredMessage("month", "ALL");
+      return ctx.reply(message);
     } catch (error) {
       console.error("Error /riwayat:", error);
 
@@ -223,14 +367,34 @@ module.exports = (bot) => {
     }
   });
 
-  // Inline button dari menu utama
+  // Inline menu_history
   bot.action("menu_history", async (ctx) => {
     await ctx.answerCbQuery();
 
+    return ctx.reply("📜 Pilih periode riwayat:", buildRiwayatPeriodKeyboard());
+  });
+
+  // Pilih periode
+  bot.action(/^history_period:(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const period = ctx.match[1];
+
+    return ctx.reply("Pilih account:", buildRiwayatAccountKeyboard(period));
+  });
+
+  // Pilih account
+  bot.action(/^history_account:(.+):(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const period = ctx.match[1];
+    const account = ctx.match[2];
+
     try {
-      return await sendRiwayat(ctx);
+      const message = await buildRiwayatFilteredMessage(period, account);
+      return ctx.reply(message);
     } catch (error) {
-      console.error("Error menu_history:", error);
+      console.error("Error history_account:", error);
 
       return ctx.reply(
         "⚠️ Gagal mengambil riwayat transaksi.\nSilakan coba lagi beberapa saat."
@@ -238,29 +402,8 @@ module.exports = (bot) => {
     }
   });
 
-  // Reply keyboard text: "📜 Riwayat"
-  bot.hears("📜 Riwayat", async (ctx) => {
-    try {
-      return await sendRiwayat(ctx);
-    } catch (error) {
-      console.error("Error hears 📜 Riwayat:", error);
-
-      return ctx.reply(
-        "⚠️ Gagal mengambil riwayat transaksi.\nSilakan coba lagi beberapa saat."
-      );
-    }
-  });
-
-  // Kalau tombol keyboard kamu cuma bertuliskan "Riwayat"
-  bot.hears("Riwayat", async (ctx) => {
-    try {
-      return await sendRiwayat(ctx);
-    } catch (error) {
-      console.error("Error hears Riwayat:", error);
-
-      return ctx.reply(
-        "⚠️ Gagal mengambil riwayat transaksi.\nSilakan coba lagi beberapa saat."
-      );
-    }
+  bot.action("history_cancel", async (ctx) => {
+    await ctx.answerCbQuery();
+    return ctx.reply("❌ Riwayat dibatalkan.");
   });
 };

@@ -516,16 +516,17 @@ function menuHandler(bot) {
     const guarded = await guardActiveFlow(ctx);
     if (guarded) return;
 
-    try {
-      const message = await buildRiwayatBulananMessage();
-      return ctx.reply(message);
-    } catch (error) {
-      console.error("Error menu riwayat:", error);
-
-      return ctx.reply(
-        "⚠️ Gagal mengambil riwayat transaksi.\nSilakan coba lagi beberapa saat."
-      );
-    }
+    return ctx.reply(
+      "📜 Pilih periode riwayat:",
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback("📅 Hari Ini", "history_period:today"),
+          Markup.button.callback("🗓 Minggu Ini", "history_period:week"),
+        ],
+        [Markup.button.callback("📆 Bulan Ini", "history_period:month")],
+        [Markup.button.callback("❌ Batal", "history_cancel")],
+      ])
+    );
   });
 
   // ==============================
