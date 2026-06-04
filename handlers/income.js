@@ -2,6 +2,7 @@ const { Markup } = require("telegraf");
 const {
   getActiveWalletsByAccount,
   appendTransactionRow,
+  generateNextTransactionId,
 } = require("../services/googleSheets");
 
 const {
@@ -522,6 +523,8 @@ module.exports = (bot) => {
     }
 
     try {
+      const transactionId = await generateNextTransactionId();
+
       const timestampInput = getTimestampInputWIB();
       const tanggal = session.transactionDate;
       const waktu = getTimeWIB();
@@ -564,6 +567,7 @@ module.exports = (bot) => {
 
       return ctx.reply(
         "✅ Pemasukan berhasil disimpan ke Google Sheet.\n\n" +
+          `ID: ${transactionId}\n` +
           `💰 ${formatRupiah(session.nominal)} masuk ke ${session.wallet}`
       );
     } catch (error) {

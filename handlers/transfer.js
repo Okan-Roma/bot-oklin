@@ -2,6 +2,7 @@ const { Markup } = require("telegraf");
 const {
   getActiveWalletsByAccount,
   appendTransactionRow,
+  generateNextTransactionId,
 } = require("../services/googleSheets");
 
 const {
@@ -297,6 +298,7 @@ bot.action("transfer_save", async (ctx) => {
       "⚠️ Sesi transfer tidak ditemukan.\nSilakan mulai lagi dari menu 🔁 Transfer Dompet."
     );
   }
+  const transactionId = await generateNextTransactionId();
 
   const timestampInput = getTimestampInputWIB();
   const waktu = getTimeWIB();
@@ -340,6 +342,7 @@ bot.action("transfer_save", async (ctx) => {
 
   return ctx.reply(
     `✅ Transfer berhasil\n\n` +
+      `ID: ${transactionId}\n` +
       `${session.sourceWallet} ➜ ${session.targetWallet}\n` +
       `${formatRupiah(session.nominal)}`
   );

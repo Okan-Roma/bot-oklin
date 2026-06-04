@@ -163,6 +163,34 @@ async function getActiveInitialBalances() {
 }
 
 // ==============================
+// ✅ AUTO GENERATE ID
+// ==============================
+
+async function generateNextTransactionId() {
+  const rows = await getAllTransactions();
+
+  let maxNumber = 0;
+
+  rows.forEach((row) => {
+    const id = String(row[0] || "").trim().toUpperCase();
+
+    const match = id.match(/^T-(\d+)$/);
+
+    if (match) {
+      const number = Number(match[1]);
+
+      if (!Number.isNaN(number) && number > maxNumber) {
+        maxNumber = number;
+      }
+    }
+  });
+
+  const nextNumber = maxNumber + 1;
+
+  return `T-${String(nextNumber).padStart(4, "0")}`;
+}
+
+// ==============================
 // ✅ EXPORT
 // ==============================
 
@@ -172,4 +200,5 @@ module.exports = {
   getActiveWalletsByAccount,
   getActiveInitialBalances,
   appendTransactionRow,
+  generateNextTransactionId,
 };
