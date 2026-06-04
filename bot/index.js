@@ -26,6 +26,27 @@ if (env.BOT_TOKEN) {
   bot = new Telegraf(env.BOT_TOKEN);
 
   // ==============================
+  // ✅ GLOBAL ERROR HANDLER
+  // ==============================
+
+  bot.catch(async (err, ctx) => {
+    console.error("Bot error caught:", {
+      errorMessage: err.message,
+      stack: err.stack,
+      updateType: ctx.updateType,
+      update: ctx.update,
+    });
+
+    try {
+      await ctx.reply(
+        "⚠️ Terjadi kesalahan saat memproses perintah.\nSilakan coba lagi beberapa saat."
+      );
+    } catch (replyError) {
+      console.error("Gagal mengirim pesan error ke user:", replyError);
+    }
+  });
+
+  // ==============================
   // ✅ START
   // ==============================
 
@@ -74,6 +95,11 @@ if (env.BOT_TOKEN) {
   saldoHandler(bot);
   rekapHandler(bot);
   riwayatHandler(bot);
+}
+
+if (bot) {
+  process.once("SIGINT", () => bot.stop("SIGINT"));
+  process.once("SIGTERM", () => bot.stop("SIGTERM"));
 }
 
 module.exports = bot;
