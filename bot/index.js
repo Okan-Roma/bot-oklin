@@ -14,6 +14,7 @@ const helpHandler = require("../handlers/help");
 const verHandler = require("../handlers/ver");
 const detailHandler = require("../handlers/detail");
 const fastInputHandler = require("../handlers/fastInput");
+const hapusHandler = require("../handlers/hapus");
 
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
@@ -53,6 +54,7 @@ if (env.BOT_TOKEN) {
   helpHandler(bot);
   verHandler(bot);
   detailHandler(bot);
+  hapusHandler(bot);
 
   // Menu keyboard bawah
   menuHandler(bot);
@@ -63,7 +65,7 @@ if (env.BOT_TOKEN) {
   transferHandler(bot);
 
   fastInputHandler(bot);
-  
+
   // Report
   saldoHandler(bot);
   rekapHandler(bot);

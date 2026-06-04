@@ -19,6 +19,7 @@ function buildHelpMessage() {
     `/ping - cek status bot dan waktu WIB\n` +
     `/last - 5 transaksi terakhir\n` +
     `/detail T2 - detail transaksi berdasarkan ID\n` +
+    `/hapus T2 - hapus transaksi berdasarkan ID\n` +
     `/riwayat - riwayat transaksi bulan ini\n` +
     `/saldo - saldo dompet\n` +
     `/rekap - rekap bulan ini\n` +
@@ -49,6 +50,10 @@ function buildHelpMessage() {
     `Contoh detail transaksi:\n` +
     `/detail T2\n` +
     `/detail T-0002\n\n` +
+
+    `Contoh hapus transaksi:\n` +
+    `/hapus T2\n` +
+    `/hapus T-0002\n\n` +   
 
     `⚠️ Catatan:\n` +
     `Jika sedang mengisi transaksi, selesaikan dulu atau tekan ❌ Batal sebelum membuka menu lain.`

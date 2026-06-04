@@ -191,6 +191,31 @@ async function generateNextTransactionId() {
 }
 
 // ==============================
+// ✅ SOFT DELETE
+// ==============================
+
+async function updateTransactionStatusAndNote(rowNumber, status, systemNote) {
+  const sheets = await getSheetsClient();
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data: [
+        {
+          range: `Transaksi!T${rowNumber}`,
+          values: [[status]],
+        },
+        {
+          range: `Transaksi!Z${rowNumber}`,
+          values: [[systemNote]],
+        },
+      ],
+    },
+  });
+}
+
+// ==============================
 // ✅ EXPORT
 // ==============================
 
@@ -201,4 +226,5 @@ module.exports = {
   getActiveInitialBalances,
   appendTransactionRow,
   generateNextTransactionId,
+  updateTransactionStatusAndNote,
 };
