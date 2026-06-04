@@ -17,6 +17,7 @@ const fastInputHandler = require("../handlers/fastInput");
 const hapusHandler = require("../handlers/hapus");
 const restoreHandler = require("../handlers/restore");
 const editHandler = require("../handlers/edit");
+const kategoriHandler = require("../handlers/kategori");
 
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
@@ -95,6 +96,7 @@ if (env.BOT_TOKEN) {
   saldoHandler(bot);
   rekapHandler(bot);
   riwayatHandler(bot);
+  kategoriHandler(bot);
 }
 
 if (bot) {

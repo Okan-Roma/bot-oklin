@@ -485,7 +485,16 @@ function menuHandler(bot) {
     const guarded = await guardActiveFlow(ctx);
     if (guarded) return;
 
-    return ctx.reply("📊 Pilih periode rekap:", buildRekapPeriodKeyboard());
+    return ctx.reply(
+      "📊 Pilih jenis rekap:",
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback("📊 Ringkasan", "menu_recap"),
+          Markup.button.callback("📂 Kategori", "menu_category"),
+        ],
+        [Markup.button.callback("❌ Batal", "rekap_cancel")],
+      ])
+    );
   });
 
   // ==============================

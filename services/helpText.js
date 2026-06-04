@@ -25,6 +25,7 @@ function buildHelpMessage() {
     `/riwayat - riwayat transaksi bulan ini\n` +
     `/saldo - saldo dompet\n` +
     `/rekap - rekap bulan ini\n` +
+    `/kategori - rekap kategori bulan ini\n` +
     `/batal - batalkan input berjalan\n` +
     `/ver - versi bot\n\n` +
 
