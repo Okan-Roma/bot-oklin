@@ -13,6 +13,7 @@ const riwayatHandler = require("../handlers/riwayat");
 const helpHandler = require("../handlers/help");
 const verHandler = require("../handlers/ver");
 const detailHandler = require("../handlers/detail");
+const fastInputHandler = require("../handlers/fastInput");
 
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
@@ -61,6 +62,8 @@ if (env.BOT_TOKEN) {
   expenseHandler(bot);
   transferHandler(bot);
 
+  fastInputHandler(bot);
+  
   // Report
   saldoHandler(bot);
   rekapHandler(bot);
