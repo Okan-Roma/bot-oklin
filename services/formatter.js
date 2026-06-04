@@ -1,5 +1,5 @@
-function formatRupiah(angka) {
-  const number = Number(String(angka || 0).replace(/[^\d.-]/g, "")) || 0;
+function formatRupiah(value) {
+  const number = Number(String(value || 0).replace(/[^\d.-]/g, "")) || 0;
   return "Rp " + number.toLocaleString("id-ID");
 }
 
@@ -9,39 +9,36 @@ function formatTanggal(dateStr) {
   const text = String(dateStr).trim();
 
   // Format DD-MM-YYYY
-  const parts = text.split("-");
+  let match = text.match(/^(\d{2})-(\d{2})-(\d{4})$/);
 
-  if (parts.length === 3) {
-    const [day, month, year] = parts;
+  if (match) {
+    const day = match[1];
+    const month = match[2];
 
-    const date = new Date(Number(year), Number(month) - 1, Number(day));
-
-    const isValidDate =
-      date.getFullYear() === Number(year) &&
-      date.getMonth() === Number(month) - 1 &&
-      date.getDate() === Number(day);
-
-    if (!isValidDate) return text;
-
-    return date.toLocaleDateString("id-ID", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    return `${day}/${month}`;
   }
 
-  // fallback kalau format lain
-  const fallbackDate = new Date(text);
+  // Format YYYY-MM-DD
+  match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
-  if (Number.isNaN(fallbackDate.getTime())) {
-    return text;
+  if (match) {
+    const month = match[2];
+    const day = match[3];
+
+    return `${day}/${month}`;
   }
 
-  return fallbackDate.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  // Format DD/MM/YYYY
+  match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+  if (match) {
+    const day = String(match[1]).padStart(2, "0");
+    const month = String(match[2]).padStart(2, "0");
+
+    return `${day}/${month}`;
+  }
+
+  return text;
 }
 
 function getJenisIcon(jenis) {
@@ -55,6 +52,7 @@ function getJenisIcon(jenis) {
 }
 
 function normalizeTransaction(trx) {
+  const id = trx.id || trx["ID Transaksi"] || "-";
   const jenis = trx.jenis || trx["Jenis Transaksi"] || "-";
   const account = trx.account || trx["Account"] || "-";
   const nominal = trx.nominal || trx["Nominal"] || 0;
@@ -76,6 +74,7 @@ function normalizeTransaction(trx) {
   }
 
   return {
+    id,
     jenis,
     account,
     nominal,
@@ -91,21 +90,23 @@ function formatLastTransactions(data) {
     return "📭 Belum ada transaksi.";
   }
 
-  let text = "📋 5 Transaksi Terakhir\n\n";
+  let text = "🧾 5 Transaksi Terakhir\n\n";
 
   data.forEach((trx, index) => {
     const item = normalizeTransaction(trx);
     const icon = getJenisIcon(item.jenis);
+    const tanggal = formatTanggal(item.tanggal);
 
-    text += `${index + 1}. ${icon} ${item.jenis}\n`;
-    text += `💳 Account : ${item.account || "-"}\n`;
-    text += `💰 Nominal : ${formatRupiah(item.nominal)}\n`;
-    text += `📂 Kategori: ${item.kategori || "-"}\n`;
-    text += `🏦 Dompet  : ${item.dompet || "-"}\n`;
-    text += `📅 Tanggal : ${formatTanggal(item.tanggal)}\n`;
-    text += `📝 Ket     : ${item.keterangan || "-"}\n`;
-    text += `\n━━━━━━━━━━━━━━\n\n`;
+    if (String(item.jenis).toLowerCase().includes("transfer")) {
+      text +=
+        `${index + 1}. ${item.id} | ${tanggal} | ${icon} ${formatRupiah(item.nominal)} | ${item.dompet}\n`;
+    } else {
+      text +=
+        `${index + 1}. ${item.id} | ${tanggal} | ${icon} ${formatRupiah(item.nominal)} | ${item.kategori} | ${item.dompet}\n`;
+    }
   });
+
+  text += `\nDetail:\nKetik /detail T2`;
 
   return text;
 }
