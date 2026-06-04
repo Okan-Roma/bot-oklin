@@ -1,6 +1,7 @@
 const { Markup } = require("telegraf");
 const {
   getAllTransactions,
+  getActiveWalletsByAccount,
   updateTransactionCells,
 } = require("../services/googleSheets");
 
@@ -11,12 +12,20 @@ const {
 const editSessions = new Map();
 
 // ==============================
-// ✅ HELPERS
+// ✅ FORMAT HELPERS
 // ==============================
 
 function formatRupiah(value) {
   const number = Number(String(value || 0).replace(/[^\d.-]/g, "")) || 0;
   return "Rp " + number.toLocaleString("id-ID");
+}
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function formatDateToDDMMYYYY(date) {
+  return `${pad2(date.getDate())}-${pad2(date.getMonth() + 1)}-${date.getFullYear()}`;
 }
 
 function parseNominal(input) {
@@ -61,6 +70,10 @@ function parseNominal(input) {
   return Math.round(number * multiplier);
 }
 
+// ==============================
+// ✅ ID HELPERS
+// ==============================
+
 function normalizeTransactionId(input) {
   if (!input) return null;
 
@@ -83,9 +96,9 @@ function normalizeTransactionId(input) {
   return `T-${String(number).padStart(4, "0")}`;
 }
 
-function pad2(value) {
-  return String(value).padStart(2, "0");
-}
+// ==============================
+// ✅ DATE HELPERS
+// ==============================
 
 function parseManualDate(input) {
   const text = String(input || "").trim();
@@ -102,18 +115,16 @@ function parseManualDate(input) {
 
   const date = new Date(year, month - 1, day);
 
-  const isValid =
+  const isValidDate =
     date.getFullYear() === year &&
     date.getMonth() === month - 1 &&
     date.getDate() === day;
 
-  if (!isValid) return null;
+  if (!isValidDate) {
+    return null;
+  }
 
   return date;
-}
-
-function formatDateToDDMMYYYY(date) {
-  return `${pad2(date.getDate())}-${pad2(date.getMonth() + 1)}-${date.getFullYear()}`;
 }
 
 function getTodayWIBDateOnly() {
@@ -151,8 +162,14 @@ function validateTransactionDate(date) {
     };
   }
 
-  return { valid: true };
+  return {
+    valid: true,
+  };
 }
+
+// ==============================
+// ✅ TRANSACTION HELPERS
+// ==============================
 
 function normalizeRow(row, rowNumber) {
   return {
@@ -206,6 +223,22 @@ function getDompetText(trx) {
   return "-";
 }
 
+function isTransferTransaction(trx) {
+  return String(trx.jenis || "").toLowerCase().includes("transfer");
+}
+
+function isIncomeTransaction(trx) {
+  return String(trx.jenis || "").toLowerCase().includes("pemasukan");
+}
+
+function isExpenseTransaction(trx) {
+  return String(trx.jenis || "").toLowerCase().includes("pengeluaran");
+}
+
+// ==============================
+// ✅ MESSAGE BUILDERS
+// ==============================
+
 function buildEditMenuMessage(trx) {
   const icon = getJenisIcon(trx.jenis);
 
@@ -224,8 +257,10 @@ function buildEditMenuMessage(trx) {
   );
 }
 
-function buildEditFieldKeyboard(transactionId) {
-  return Markup.inlineKeyboard([
+function buildEditFieldKeyboard(transactionId, jenis) {
+  const isTransfer = String(jenis || "").toLowerCase().includes("transfer");
+
+  const rows = [
     [
       Markup.button.callback("💰 Nominal", `edit_field:${transactionId}:nominal`),
       Markup.button.callback("📅 Tanggal", `edit_field:${transactionId}:tanggal`),
@@ -234,10 +269,44 @@ function buildEditFieldKeyboard(transactionId) {
       Markup.button.callback("📂 Kategori", `edit_field:${transactionId}:kategori`),
       Markup.button.callback("📝 Keterangan", `edit_field:${transactionId}:keterangan`),
     ],
-    [
-      Markup.button.callback("❌ Batal", "edit_cancel"),
-    ],
-  ]);
+  ];
+
+  if (isTransfer) {
+    rows.push([
+      Markup.button.callback(
+        "🏦 Dompet Sumber",
+        `edit_field:${transactionId}:dompet_sumber`
+      ),
+      Markup.button.callback(
+        "🏦 Dompet Tujuan",
+        `edit_field:${transactionId}:dompet_tujuan`
+      ),
+    ]);
+  } else {
+    rows.push([
+      Markup.button.callback("🏦 Dompet", `edit_field:${transactionId}:dompet`),
+    ]);
+  }
+
+  rows.push([Markup.button.callback("❌ Batal", "edit_cancel")]);
+
+  return Markup.inlineKeyboard(rows);
+}
+
+function buildWalletKeyboard(wallets, callbackPrefix) {
+  const rows = [];
+
+  for (let i = 0; i < wallets.length; i += 2) {
+    const row = wallets.slice(i, i + 2).map((wallet) => {
+      return Markup.button.callback(wallet, `${callbackPrefix}:${wallet}`);
+    });
+
+    rows.push(row);
+  }
+
+  rows.push([Markup.button.callback("❌ Batal", "edit_cancel")]);
+
+  return Markup.inlineKeyboard(rows);
 }
 
 function buildConfirmKeyboard() {
@@ -254,6 +323,10 @@ function getFieldLabel(field) {
   if (field === "tanggal") return "Tanggal";
   if (field === "kategori") return "Kategori";
   if (field === "keterangan") return "Keterangan";
+  if (field === "dompet") return "Dompet";
+  if (field === "dompet_sumber") return "Dompet Sumber";
+  if (field === "dompet_tujuan") return "Dompet Tujuan";
+
   return field;
 }
 
@@ -262,7 +335,217 @@ function getOldValueByField(trx, field) {
   if (field === "tanggal") return trx.tanggal;
   if (field === "kategori") return trx.kategori;
   if (field === "keterangan") return trx.keterangan;
+
+  if (field === "dompet") {
+    if (isIncomeTransaction(trx)) return trx.dompetTujuan || "-";
+    if (isExpenseTransaction(trx)) return trx.dompetSumber || "-";
+    return getDompetText(trx);
+  }
+
+  if (field === "dompet_sumber") return trx.dompetSumber || "-";
+  if (field === "dompet_tujuan") return trx.dompetTujuan || "-";
+
   return "-";
+}
+
+function buildEditConfirmMessage(trx, field, oldValue, newValue) {
+  return (
+    `✏️ Konfirmasi Edit\n\n` +
+    `ID     : ${trx.id}\n` +
+    `Field  : ${getFieldLabel(field)}\n` +
+    `Dari   : ${oldValue}\n` +
+    `Ke     : ${newValue}\n\n` +
+    `Simpan perubahan ini?`
+  );
+}
+
+// ==============================
+// ✅ FIND TRANSACTION
+// ==============================
+
+async function findTransactionById(transactionId) {
+  const rows = await getAllTransactions();
+
+  if (!rows || !rows.length) {
+    return null;
+  }
+
+  let found = null;
+
+  rows.forEach((row, index) => {
+    const rowId = String(row[0] || "").trim().toUpperCase();
+
+    if (rowId === transactionId) {
+      found = normalizeRow(row, index + 2);
+    }
+  });
+
+  return found;
+}
+
+// ==============================
+// ✅ UPDATE BUILDERS
+// ==============================
+
+function buildTextFieldUpdates(field, input, trx) {
+  let newDisplayValue = input;
+  let updates = {};
+
+  if (field === "nominal") {
+    const nominal = parseNominal(input);
+
+    if (!nominal) {
+      return {
+        error: "⚠️ Nominal baru tidak dikenali.\n\nContoh: 125rb",
+      };
+    }
+
+    newDisplayValue = formatRupiah(nominal);
+
+    updates = {
+      I: nominal,
+      J: input,
+      Z: "Diedit via Bot Telegram - Nominal",
+    };
+  }
+
+  if (field === "tanggal") {
+    const parsedDate = parseManualDate(input);
+
+    if (!parsedDate) {
+      return {
+        error: "⚠️ Format tanggal belum dikenali.\n\nGunakan DD-MM-YYYY.",
+      };
+    }
+
+    const validation = validateTransactionDate(parsedDate);
+
+    if (!validation.valid) {
+      return {
+        error: validation.message,
+      };
+    }
+
+    const tanggal = formatDateToDDMMYYYY(parsedDate);
+    const bulan = Number(tanggal.split("-")[1]);
+    const tahun = Number(tanggal.split("-")[2]);
+
+    newDisplayValue = tanggal;
+
+    updates = {
+      C: tanggal,
+      R: bulan,
+      S: tahun,
+      Z: "Diedit via Bot Telegram - Tanggal",
+    };
+  }
+
+  if (field === "kategori") {
+    const kategori = input || "-";
+
+    newDisplayValue = kategori;
+
+    updates = {
+      K: kategori,
+      Z: "Diedit via Bot Telegram - Kategori",
+    };
+  }
+
+  if (field === "keterangan") {
+    const keterangan = input || "-";
+
+    newDisplayValue = keterangan;
+
+    updates = {
+      P: keterangan,
+      Z: "Diedit via Bot Telegram - Keterangan",
+    };
+  }
+
+  if (!Object.keys(updates).length) {
+    return {
+      error: "⚠️ Edit tidak dapat diproses.",
+    };
+  }
+
+  return {
+    updates,
+    newDisplayValue,
+    oldDisplayValue: getOldValueByField(trx, field),
+  };
+}
+
+function buildWalletUpdates(field, newWallet, trx) {
+  let updates = {};
+
+  if (field === "dompet") {
+    if (isIncomeTransaction(trx)) {
+      updates = {
+        M: newWallet,
+        Z: "Diedit via Bot Telegram - Dompet",
+      };
+    } else if (isExpenseTransaction(trx)) {
+      updates = {
+        L: newWallet,
+        Z: "Diedit via Bot Telegram - Dompet",
+      };
+    } else {
+      return {
+        error:
+          "⚠️ Untuk transaksi Transfer, pilih Dompet Sumber atau Dompet Tujuan secara terpisah.",
+      };
+    }
+  }
+
+  if (field === "dompet_sumber") {
+    if (!isTransferTransaction(trx)) {
+      return {
+        error: "⚠️ Dompet Sumber khusus untuk transaksi Transfer.",
+      };
+    }
+
+    if (newWallet === trx.dompetTujuan) {
+      return {
+        error: "⚠️ Dompet sumber dan tujuan tidak boleh sama.",
+      };
+    }
+
+    updates = {
+      L: newWallet,
+      Z: "Diedit via Bot Telegram - Dompet Sumber",
+    };
+  }
+
+  if (field === "dompet_tujuan") {
+    if (!isTransferTransaction(trx)) {
+      return {
+        error: "⚠️ Dompet Tujuan khusus untuk transaksi Transfer.",
+      };
+    }
+
+    if (newWallet === trx.dompetSumber) {
+      return {
+        error: "⚠️ Dompet sumber dan tujuan tidak boleh sama.",
+      };
+    }
+
+    updates = {
+      M: newWallet,
+      Z: "Diedit via Bot Telegram - Dompet Tujuan",
+    };
+  }
+
+  if (!Object.keys(updates).length) {
+    return {
+      error: "⚠️ Edit dompet tidak dapat diproses.",
+    };
+  }
+
+  return {
+    updates,
+    newDisplayValue: newWallet,
+    oldDisplayValue: getOldValueByField(trx, field),
+  };
 }
 
 // ==============================
@@ -270,6 +553,10 @@ function getOldValueByField(trx, field) {
 // ==============================
 
 module.exports = (bot) => {
+  // ==============================
+  // ✅ /edit
+  // ==============================
+
   bot.command("edit", async (ctx) => {
     try {
       const text = ctx.message.text || "";
@@ -297,21 +584,7 @@ module.exports = (bot) => {
         );
       }
 
-      const rows = await getAllTransactions();
-
-      if (!rows || !rows.length) {
-        return ctx.reply("⚠️ Belum ada data transaksi.");
-      }
-
-      let found = null;
-
-      rows.forEach((row, index) => {
-        const rowId = String(row[0] || "").trim().toUpperCase();
-
-        if (rowId === normalizedId) {
-          found = normalizeRow(row, index + 2);
-        }
-      });
+      const found = await findTransactionById(normalizedId);
 
       if (!found) {
         return ctx.reply(
@@ -338,7 +611,7 @@ module.exports = (bot) => {
 
       return ctx.reply(
         buildEditMenuMessage(found),
-        buildEditFieldKeyboard(found.id)
+        buildEditFieldKeyboard(found.id, found.jenis)
       );
     } catch (error) {
       console.error("Error /edit:", error);
@@ -348,6 +621,10 @@ module.exports = (bot) => {
       );
     }
   });
+
+  // ==============================
+  // ✅ PILIH FIELD
+  // ==============================
 
   bot.action(/^edit_field:(.+):(.+)$/, async (ctx) => {
     await ctx.answerCbQuery();
@@ -368,9 +645,36 @@ module.exports = (bot) => {
       return ctx.reply("⚠️ ID edit tidak cocok.");
     }
 
-    session.step = "input_value";
     session.field = field;
 
+    if (["dompet", "dompet_sumber", "dompet_tujuan"].includes(field)) {
+      try {
+        const wallets = await getActiveWalletsByAccount(session.trx.account);
+
+        if (!wallets.length) {
+          return ctx.reply(
+            `⚠️ Tidak ada dompet aktif untuk account ${session.trx.account}.\n` +
+              `Silakan cek tab Dompet di Google Sheet.`
+          );
+        }
+
+        session.step = "choose_wallet";
+        editSessions.set(userKey, session);
+
+        return ctx.reply(
+          `Pilih ${getFieldLabel(field)} baru:`,
+          buildWalletKeyboard(wallets, "edit_wallet")
+        );
+      } catch (error) {
+        console.error("Error ambil dompet edit:", error);
+
+        return ctx.reply(
+          "⚠️ Bot sedang kesulitan membaca daftar dompet.\nSilakan coba lagi beberapa saat."
+        );
+      }
+    }
+
+    session.step = "input_value";
     editSessions.set(userKey, session);
 
     if (field === "nominal") {
@@ -413,6 +717,54 @@ module.exports = (bot) => {
     return ctx.reply("⚠️ Field edit tidak dikenali.");
   });
 
+  // ==============================
+  // ✅ PILIH DOMPET
+  // ==============================
+
+  bot.action(/^edit_wallet:(.+)$/, async (ctx) => {
+    await ctx.answerCbQuery();
+
+    const userKey = String(ctx.from.id);
+    const session = editSessions.get(userKey);
+
+    if (!session || session.step !== "choose_wallet") {
+      return ctx.reply(
+        "⚠️ Sesi pilih dompet tidak ditemukan.\nSilakan ulangi dengan /edit ID."
+      );
+    }
+
+    const newWallet = ctx.match[1];
+    const field = session.field;
+    const trx = session.trx;
+
+    const result = buildWalletUpdates(field, newWallet, trx);
+
+    if (result.error) {
+      return ctx.reply(result.error);
+    }
+
+    session.step = "confirm";
+    session.newDisplayValue = result.newDisplayValue;
+    session.oldDisplayValue = result.oldDisplayValue;
+    session.updates = result.updates;
+
+    editSessions.set(userKey, session);
+
+    return ctx.reply(
+      buildEditConfirmMessage(
+        trx,
+        field,
+        result.oldDisplayValue,
+        result.newDisplayValue
+      ),
+      buildConfirmKeyboard()
+    );
+  });
+
+  // ==============================
+  // ✅ INPUT TEXT UNTUK FIELD
+  // ==============================
+
   bot.on("text", async (ctx, next) => {
     const userKey = String(ctx.from.id);
     const session = editSessions.get(userKey);
@@ -429,98 +781,33 @@ module.exports = (bot) => {
     const field = session.field;
     const trx = session.trx;
 
-    let newDisplayValue = input;
-    let updates = {};
+    const result = buildTextFieldUpdates(field, input, trx);
 
-    if (field === "nominal") {
-      const nominal = parseNominal(input);
-
-      if (!nominal) {
-        return ctx.reply(
-          "⚠️ Nominal baru tidak dikenali.\n\nContoh: 125rb"
-        );
-      }
-
-      newDisplayValue = formatRupiah(nominal);
-
-      updates = {
-        I: nominal,
-        J: input,
-        Z: `Diedit via Bot Telegram - Nominal`,
-      };
-    }
-
-    if (field === "tanggal") {
-      const parsedDate = parseManualDate(input);
-
-      if (!parsedDate) {
-        return ctx.reply(
-          "⚠️ Format tanggal belum dikenali.\n\nGunakan DD-MM-YYYY."
-        );
-      }
-
-      const validation = validateTransactionDate(parsedDate);
-
-      if (!validation.valid) {
-        return ctx.reply(validation.message);
-      }
-
-      const tanggal = formatDateToDDMMYYYY(parsedDate);
-      const bulan = Number(tanggal.split("-")[1]);
-      const tahun = Number(tanggal.split("-")[2]);
-
-      newDisplayValue = tanggal;
-
-      updates = {
-        C: tanggal,
-        R: bulan,
-        S: tahun,
-        Z: `Diedit via Bot Telegram - Tanggal`,
-      };
-    }
-
-    if (field === "kategori") {
-      const kategori = input || "-";
-
-      newDisplayValue = kategori;
-
-      updates = {
-        K: kategori,
-        Z: `Diedit via Bot Telegram - Kategori`,
-      };
-    }
-
-    if (field === "keterangan") {
-      const keterangan = input || "-";
-
-      newDisplayValue = keterangan;
-
-      updates = {
-        P: keterangan,
-        Z: `Diedit via Bot Telegram - Keterangan`,
-      };
-    }
-
-    if (!Object.keys(updates).length) {
-      return ctx.reply("⚠️ Edit tidak dapat diproses.");
+    if (result.error) {
+      return ctx.reply(result.error);
     }
 
     session.step = "confirm";
-    session.newDisplayValue = newDisplayValue;
-    session.updates = updates;
+    session.newDisplayValue = result.newDisplayValue;
+    session.oldDisplayValue = result.oldDisplayValue;
+    session.updates = result.updates;
 
     editSessions.set(userKey, session);
 
     return ctx.reply(
-      `✏️ Konfirmasi Edit\n\n` +
-        `ID     : ${trx.id}\n` +
-        `Field  : ${getFieldLabel(field)}\n` +
-        `Dari   : ${getOldValueByField(trx, field)}\n` +
-        `Ke     : ${newDisplayValue}\n\n` +
-        `Simpan perubahan ini?`,
+      buildEditConfirmMessage(
+        trx,
+        field,
+        result.oldDisplayValue,
+        result.newDisplayValue
+      ),
       buildConfirmKeyboard()
     );
   });
+
+  // ==============================
+  // ✅ KONFIRMASI SIMPAN EDIT
+  // ==============================
 
   bot.action("edit_confirm", async (ctx) => {
     await ctx.answerCbQuery();
@@ -557,6 +844,10 @@ module.exports = (bot) => {
       );
     }
   });
+
+  // ==============================
+  // ✅ BATAL EDIT
+  // ==============================
 
   bot.action("edit_cancel", async (ctx) => {
     await ctx.answerCbQuery();
