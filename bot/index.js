@@ -10,6 +10,9 @@ const transferHandler = require("../handlers/transfer");
 const saldoHandler = require("../handlers/saldo");
 const rekapHandler = require("../handlers/rekap");
 const riwayatHandler = require("../handlers/riwayat");
+const helpHandler = require("../handlers/help");
+const verHandler = require("../handlers/ver");
+
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
 let bot = null;
@@ -27,31 +30,36 @@ if (env.BOT_TOKEN) {
     return ctx.reply(
       `Halo ${name} 👋\n` +
         `Selamat datang di Bot Rekap Keuangan Oklin.\n\n` +
-        `Silakan pilih menu dari keyboard bawah atau gunakan command:\n` +
-        `/ping\n` +
-        `/last\n` +
-        `/saldo\n` +
-        `/rekap\n` +
-        `/batal`,
+        `Silakan pilih menu dari keyboard bawah.\n\n` +
+        `Command cepat:\n` +
+        `/help - bantuan\n` +
+        `/ping - cek bot\n` +
+        `/last - 5 transaksi terakhir\n` +
+        `/saldo - saldo dompet\n` +
+        `/rekap - rekap bulan ini\n` +
+        `/batal - batalkan input`,
       mainMenuKeyboard()
     );
   });
 
   // ==============================
   // ✅ REGISTER HANDLER
-  // Urutan penting:
-  // menuHandler sebelum flow handler
-  // supaya tombol keyboard bawah bisa dicegat dulu.
   // ==============================
 
   pingHandler(bot);
   lastHandler(bot);
+  helpHandler(bot);
+  verHandler(bot);
+
+  // Menu keyboard bawah
   menuHandler(bot);
 
+  // Flow transaksi
   incomeHandler(bot);
   expenseHandler(bot);
   transferHandler(bot);
 
+  // Report
   saldoHandler(bot);
   rekapHandler(bot);
   riwayatHandler(bot);

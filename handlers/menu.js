@@ -11,6 +11,8 @@ const {
   getActiveInitialBalances,
 } = require("../services/googleSheets");
 
+const { buildHelpMessage } = require("../services/helpText");
+
 // ==============================
 // ✅ MAIN KEYBOARD
 // ==============================
@@ -531,27 +533,10 @@ function menuHandler(bot) {
   // ==============================
 
   bot.hears("❓ Bantuan", async (ctx) => {
-    const guarded = await guardActiveFlow(ctx);
-    if (guarded) return;
+  const guarded = await guardActiveFlow(ctx);
+  if (guarded) return;
 
-    return ctx.reply(
-      `❓ Bantuan Bot Oklin\n\n` +
-        `Menu utama tersedia di keyboard bawah.\n\n` +
-        `Command:\n` +
-        `/ping - cek status bot\n` +
-        `/last - 5 transaksi terakhir\n` +
-        `/riwayat - riwayat transaksi bulan ini\n` +
-        `/saldo - saldo dompet\n` +
-        `/rekap - rekap bulan ini\n` +
-        `/batal - batalkan input berjalan\n\n` +
-        `Format nominal:\n` +
-        `- 20000\n` +
-        `- 20k\n` +
-        `- 100rb\n` +
-        `- 100ribu\n` +
-        `- 1,5jt\n` +
-        `- 2juta`
-    );
+  return ctx.reply(buildHelpMessage());
   });
 }
 
