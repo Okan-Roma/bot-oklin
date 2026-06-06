@@ -492,6 +492,9 @@ function menuHandler(bot) {
           Markup.button.callback("📊 Ringkasan", "menu_recap"),
           Markup.button.callback("📂 Kategori", "menu_category"),
         ],
+        [
+          Markup.button.callback("💸 Budget", "menu_budget"),
+        ],
         [Markup.button.callback("❌ Batal", "rekap_cancel")],
       ])
     );

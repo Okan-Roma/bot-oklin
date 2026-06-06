@@ -238,6 +238,25 @@ async function updateTransactionCells(rowNumber, updates) {
 }
 
 // ==============================
+// ✅ BUDGETING
+// ==============================
+
+async function getActiveBudgetsByMonthYear(month, year) {
+  const rows = await getSheetRows("Budget", "A:J");
+
+  return rows.filter((item) => {
+    const itemMonth = Number(item["Bulan"] || 0);
+    const itemYear = Number(item["Tahun"] || 0);
+    const status = (item["Status"] || "")
+      .toString()
+      .trim()
+      .toLowerCase();
+
+    return itemMonth === Number(month) && itemYear === Number(year) && status === "aktif";
+  });
+}
+
+// ==============================
 // ✅ EXPORT
 // ==============================
 
@@ -250,4 +269,5 @@ module.exports = {
   generateNextTransactionId,
   updateTransactionStatusAndNote,
   updateTransactionCells,
+  getActiveBudgetsByMonthYear,
 };
