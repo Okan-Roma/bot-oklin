@@ -5,6 +5,10 @@ const {
   generateNextTransactionId,
 } = require("../services/googleSheets");
 
+const {
+  getBudgetWarningMessageForAccount,
+} = require("../services/budgetChecker");
+
 // ==============================
 // ✅ SESSION FAST INPUT
 // ==============================
@@ -576,13 +580,25 @@ module.exports = (bot) => {
     try {
       const transactionId = await saveFastInput(ctx, session);
 
+      let budgetWarning = null;
+
+      if (session.jenis === "Pengeluaran") {
+        budgetWarning = await getBudgetWarningMessageForAccount(session.account);
+      }
+
       fastInputSessions.delete(userKey);
 
-      return ctx.reply(
+      let message =
         `✅ Fast input berhasil disimpan.\n\n` +
-          `ID: ${transactionId}\n` +
-          `${session.jenis} ${formatRupiah(session.nominal)}`
-      );
+        `ID: ${transactionId}\n` +
+        `${session.jenis} ${formatRupiah(session.nominal)}`;
+
+      if (budgetWarning) {
+        message += `\n\n${budgetWarning}`;
+      }
+
+      return ctx.reply(message);
+
     } catch (error) {
       console.error("Error fast_save:", error);
 

@@ -11,6 +11,10 @@ const {
   clearUserSession,
 } = require("../services/sessionManager");
 
+const {
+  getBudgetWarningMessageForAccount,
+} = require("../services/budgetChecker");
+
 // ==============================
 // ✅ SESSION SEMENTARA
 // ==============================
@@ -567,13 +571,21 @@ module.exports = (bot) => {
 
       await appendTransactionRow(rowData);
 
+      const budgetWarning = await getBudgetWarningMessageForAccount(session.account);
+
       clearUserSession(ctx.from.id);
 
-      return ctx.reply(
-        "✅ Pengeluaran berhasil disimpan ke Google Sheet.\n\n" +
-          `ID: ${transactionId}\n` +
-          `💰 ${formatRupiah(session.nominal)} keluar dari ${session.wallet}`
-      );
+      let message =
+        "✅ Pengeluaran berhasil disimpan.\n\n" +
+        `ID: ${transactionId}\n` +
+        `💰 ${formatRupiah(session.nominal)} keluar dari ${session.wallet}`;
+
+      if (budgetWarning) {
+        message += `\n\n${budgetWarning}`;
+      }
+
+      return ctx.reply(message);
+
     } catch (error) {
       console.error("Error simpan transaksi:", error);
 

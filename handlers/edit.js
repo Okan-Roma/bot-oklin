@@ -5,6 +5,10 @@ const {
   updateTransactionCells,
 } = require("../services/googleSheets");
 
+const {
+  getBudgetWarningMessageForAccount,
+} = require("../services/budgetChecker");
+
 // ==============================
 // ✅ SESSION EDIT
 // ==============================
@@ -828,14 +832,31 @@ module.exports = (bot) => {
       const fieldLabel = getFieldLabel(session.field);
       const newValue = session.newDisplayValue;
 
+      let budgetWarning = null;
+
+      const jenis = String(session.trx.jenis || "").toLowerCase();
+      const shouldCheckBudget =
+        jenis.includes("pengeluaran") &&
+        ["nominal", "tanggal"].includes(session.field);
+
+      if (shouldCheckBudget) {
+        budgetWarning = await getBudgetWarningMessageForAccount(session.trx.account);
+      }
+
       editSessions.delete(userKey);
 
-      return ctx.reply(
-        `✅ Transaksi berhasil diedit.\n\n` +
-          `ID    : ${trxId}\n` +
-          `Field : ${fieldLabel}\n` +
-          `Nilai : ${newValue}`
-      );
+      let message =
+      `✅ Transaksi berhasil diedit.\n\n` +
+      `ID    : ${trxId}\n` +
+      `Field : ${fieldLabel}\n` +
+      `Nilai : ${newValue}`;
+
+      if (budgetWarning) {
+        message += `\n\n${budgetWarning}`;
+      }
+
+      return ctx.reply(message);
+
     } catch (error) {
       console.error("Error edit_confirm:", error);
 

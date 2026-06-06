@@ -4,6 +4,10 @@ const {
   updateTransactionStatusAndNote,
 } = require("../services/googleSheets");
 
+const {
+  getBudgetWarningMessageForAccount,
+} = require("../services/budgetChecker");
+
 // ==============================
 // ✅ SESSION RESTORE
 // ==============================
@@ -234,13 +238,26 @@ module.exports = (bot) => {
         "Restore via Bot Telegram"
       );
 
+      let budgetWarning = null;
+
+      const jenis = String(session.jenis || "").toLowerCase();
+
+      if (jenis.includes("pengeluaran")) {
+        budgetWarning = await getBudgetWarningMessageForAccount(session.account);
+      }
+
       restoreSessions.delete(userKey);
 
-      return ctx.reply(
+      let message =
         `✅ Transaksi berhasil direstore.\n\n` +
-          `ID: ${session.id}\n` +
-          `${getJenisIcon(session.jenis)} ${session.jenis} ${formatRupiah(session.nominal)}`
-      );
+        `ID: ${session.id}\n` +
+        `${getJenisIcon(session.jenis)} ${session.jenis} ${formatRupiah(session.nominal)}`;
+
+      if (budgetWarning) {
+        message += `\n\n${budgetWarning}`;
+      }
+
+      return ctx.reply(message);
     } catch (error) {
       console.error("Error restore_confirm:", error);
 
