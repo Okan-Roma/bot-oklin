@@ -218,7 +218,24 @@ function buildBudgetSummaryBlock(label, limitBudget, used) {
     `Limit Budget : ${formatRupiah(limitBudget)}\n` +
     `Terpakai     : ${formatRupiah(used)}\n`;
 
-  if (used > limitBudget && limitBudget > 0) {
+  // ==============================
+  // ✅ Jika budget belum diset
+  // ==============================
+
+  if (!limitBudget || limitBudget <= 0) {
+    message +=
+      `Sisa         : -\n` +
+      `Progress     : -\n` +
+      `Status       : ${status}\n`;
+
+    return message;
+  }
+
+  // ==============================
+  // ✅ Jika over budget
+  // ==============================
+
+  if (used > limitBudget) {
     message += `🚨 Over !!!   : ${formatRupiah(used - limitBudget)}\n`;
   } else {
     message += `Sisa         : ${formatRupiah(remaining)}\n`;
