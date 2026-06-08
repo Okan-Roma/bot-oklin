@@ -305,6 +305,29 @@ async function appendBudgetRows(rowsData) {
 }
 
 // ==============================
+// ✅ EDIT BUDGET
+// ==============================
+
+async function updateBudgetCells(rowNumber, updates) {
+  const sheets = await getSheetsClient();
+
+  const data = Object.entries(updates).map(([column, value]) => {
+    return {
+      range: `Budget!${column}${rowNumber}`,
+      values: [[value]],
+    };
+  });
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data,
+    },
+  });
+}
+
+// ==============================
 // ✅ EXPORT
 // ==============================
 
@@ -321,4 +344,5 @@ module.exports = {
   getAllBudgetRows,
   generateNextBudgetId,
   appendBudgetRows,
+  updateBudgetCells,
 };

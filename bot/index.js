@@ -20,6 +20,7 @@ const editHandler = require("../handlers/edit");
 const kategoriHandler = require("../handlers/kategori");
 const budgetHandler = require("../handlers/budget");
 const copyBudgetHandler = require("../handlers/copybudget");
+const editBudgetHandler = require("../handlers/editbudget");
 
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
@@ -83,6 +84,7 @@ if (env.BOT_TOKEN) {
   hapusHandler(bot);
   restoreHandler(bot);
   editHandler(bot);
+  editBudgetHandler(bot);
 
   // Menu keyboard bawah
   menuHandler(bot);
