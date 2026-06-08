@@ -44,12 +44,15 @@ function buildHelpMessage() {
 
     `⚡ Fast input:\n` +
     `out 25k makan cash beli nasi\n` +
+    `out 02-06-2026 25k makan cash beli nasi\n` +
     `in 3jt payroll bca gaji bulan mei\n` +
-    `tf 100k bca cash tarik tunai\n\n` +
+    `in 01-06-2026 3jt payroll bca gaji bulan juni\n` +
+    `tf 100k bca cash tarik tunai\n` +
+    `tf 03-06-2026 100k bca cash tarik tunai\n\n` +
     `Account opsional:\n` +
     `m = Mamah, i = Isal\n` +
     `Contoh:\n` +
-    `out m 50k makan cash belanja sayur\n\n` +  
+    `out m 02-06-2026 50k makan cash belanja sayur\n\n` +
 
     `📅 Format tanggal manual:\n` +
     `DD-MM-YYYY\n` +

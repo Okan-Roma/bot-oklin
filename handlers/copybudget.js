@@ -2,7 +2,6 @@ const { Markup } = require("telegraf");
 const {
   getActiveBudgetsByMonthYear,
   getAllBudgetRows,
-  generateNextBudgetId,
   appendBudgetRows,
 } = require("../services/googleSheets");
 
@@ -119,6 +118,31 @@ function makeBudgetKey(account, category, month, year) {
   return `${String(account).trim().toLowerCase()}|||${String(category)
     .trim()
     .toLowerCase()}|||${month}|||${year}`;
+}
+
+function getMaxBudgetNumber(rows) {
+  let maxNumber = 0;
+
+  rows.forEach((row) => {
+    const id = String(row["ID Budget"] || "").trim().toUpperCase();
+    const match = id.match(/^B-(\d+)$/);
+
+    if (!match) {
+      return;
+    }
+
+    const number = Number(match[1]);
+
+    if (!Number.isNaN(number) && number > maxNumber) {
+      maxNumber = number;
+    }
+  });
+
+  return maxNumber;
+}
+
+function buildBudgetId(number) {
+  return `B-${String(number).padStart(4, "0")}`;
 }
 
 function buildConfirmKeyboard() {
@@ -264,7 +288,6 @@ module.exports = (bot) => {
       const text = ctx.message.text || "";
       const arg = text.split(" ").slice(1).join(" ").trim().toLowerCase();
 
-      // default:
       // /copybudget      = bulan sebelumnya -> bulan ini
       // /copybudget next = bulan ini -> bulan berikutnya
       const mode = arg === "next" ? "next" : "current";
@@ -301,12 +324,13 @@ module.exports = (bot) => {
     }
 
     try {
-      const rowsToAppend = [];
+      const allBudgetRows = await getAllBudgetRows();
+      const maxNumber = getMaxBudgetNumber(allBudgetRows);
 
-      for (const budget of plan.copyCandidates) {
-        const nextId = await generateNextBudgetId();
+      const rowsToAppend = plan.copyCandidates.map((budget, index) => {
+        const nextId = buildBudgetId(maxNumber + index + 1);
 
-        rowsToAppend.push([
+        return [
           nextId,
           budget.account,
           plan.target.month,
@@ -317,8 +341,8 @@ module.exports = (bot) => {
           "Belum",
           "Aktif",
           `Copy dari ${getMonthName(plan.source.month)} ${plan.source.year}`,
-        ]);
-      }
+        ];
+      });
 
       await appendBudgetRows(rowsToAppend);
 
@@ -333,9 +357,7 @@ module.exports = (bot) => {
     } catch (error) {
       console.error("Error copybudget_confirm:", error);
 
-      return ctx.reply(
-        "⚠️ Gagal copy budget.\nSilakan coba lagi."
-      );
+      return ctx.reply("⚠️ Gagal copy budget.\nSilakan coba lagi.");
     }
   });
 

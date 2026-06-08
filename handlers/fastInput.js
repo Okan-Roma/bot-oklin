@@ -117,6 +117,120 @@ function getTodayDateWIB() {
   return `${day}-${month}-${year}`;
 }
 
+function parseManualDate(input) {
+  const text = String(input || "").trim();
+
+  const match = text.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  const date = new Date(year, month - 1, day);
+
+  const isValidDate =
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day;
+
+  if (!isValidDate) {
+    return null;
+  }
+
+  return date;
+}
+
+function formatDateToDDMMYYYY(date) {
+  const day = pad2(date.getDate());
+  const month = pad2(date.getMonth() + 1);
+  const year = date.getFullYear();
+
+  return `${day}-${month}-${year}`;
+}
+
+function getTodayWIBDateOnly() {
+  const parts = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(new Date());
+
+  const day = Number(parts.find((p) => p.type === "day").value);
+  const month = Number(parts.find((p) => p.type === "month").value);
+  const year = Number(parts.find((p) => p.type === "year").value);
+
+  return new Date(year, month - 1, day);
+}
+
+function validateTransactionDate(date) {
+  const today = getTodayWIBDateOnly();
+
+  if (date > today) {
+    return {
+      valid: false,
+      message: "Tanggal transaksi tidak boleh tanggal masa depan.",
+    };
+  }
+
+  const diffMs = today.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays > 30) {
+    return {
+      valid: false,
+      message: "Tanggal transaksi maksimal 30 hari ke belakang.",
+    };
+  }
+
+  return {
+    valid: true,
+  };
+}
+
+function parseOptionalFastDate(token) {
+  if (!token) {
+    return null;
+  }
+
+  const text = String(token).trim();
+
+  // Format valid fast input: DD-MM-YYYY
+  if (/^\d{2}-\d{2}-\d{4}$/.test(text)) {
+    const parsedDate = parseManualDate(text);
+
+    if (!parsedDate) {
+      throw new Error(
+        "Tanggal tidak valid.\nGunakan format DD-MM-YYYY.\nContoh: 02-06-2026"
+      );
+    }
+
+    const validation = validateTransactionDate(parsedDate);
+
+    if (!validation.valid) {
+      throw new Error(validation.message);
+    }
+
+    return formatDateToDDMMYYYY(parsedDate);
+  }
+
+  // Kalau user input format tanggal lain, kasih arahan
+  if (
+    /^\d{4}-\d{2}-\d{2}$/.test(text) ||
+    /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)
+  ) {
+    throw new Error(
+      "Format tanggal belum didukung untuk fast input.\nGunakan DD-MM-YYYY.\nContoh: 02-06-2026"
+    );
+  }
+
+  return null;
+}
+
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -262,6 +376,22 @@ async function parseFastInput(text) {
   }
 
   // ==============================
+  // ✅ TANGGAL MANUAL OPSIONAL
+  // Format:
+  // out 02-06-2026 100rb makan bni ket
+  // out m 02-06-2026 100rb makan cash ket
+  // ==============================
+
+  let transactionDate = getTodayDateWIB();
+
+  const maybeDate = parseOptionalFastDate(tokens[index]);
+
+  if (maybeDate) {
+    transactionDate = maybeDate;
+    index += 1;
+  }
+
+  // ==============================
   // ✅ IN / OUT
   // ==============================
 
@@ -308,7 +438,7 @@ async function parseFastInput(text) {
       category,
       wallet,
       description,
-      transactionDate: getTodayDateWIB(),
+      transactionDate,
     };
   }
 
@@ -364,7 +494,7 @@ async function parseFastInput(text) {
       sourceWallet,
       targetWallet,
       description,
-      transactionDate: getTodayDateWIB(),
+      transactionDate,
     };
   }
 
@@ -558,11 +688,15 @@ module.exports = (bot) => {
         `⚠️ Fast input belum bisa diproses.\n\n${error.message}\n\n` +
           `Contoh:\n` +
           `out 25k makan cash beli nasi\n` +
+          `out 02-06-2026 25k makan cash beli nasi\n` +
           `in 3jt payroll bca gaji bulan mei\n` +
+          `in 01-06-2026 3jt payroll bca gaji bulan mei\n` +
           `tf 100k bca cash tarik tunai\n\n` +
+          `tf 03-06-2026 100k bca cash tarik tunai\n\n` +
           `Account opsional:\n` +
           `m = Mamah, i = Isal\n` +
           `Contoh: out m 50k makan cash belanja sayur`
+          `Contoh: out m 02-06-2026 50k makan cash belanja sayur`
       );
     }
   });
