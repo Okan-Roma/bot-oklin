@@ -318,5 +318,7 @@ module.exports = {
   updateTransactionStatusAndNote,
   updateTransactionCells,
   getActiveBudgetsByMonthYear,
+  getAllBudgetRows,
+  generateNextBudgetId,
   appendBudgetRows,
 };
