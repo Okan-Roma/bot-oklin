@@ -561,10 +561,16 @@ module.exports = (bot) => {
   // ✅ /edit
   // ==============================
 
-  bot.command("edit", async (ctx) => {
+  bot.command("edit", async (ctx, next) => {
     try {
       const text = ctx.message.text || "";
       const args = text.split(" ").slice(1).join(" ").trim();
+
+      const firstArg = args.split(/\s+/)[0] || "";
+
+      if (/^b/i.test(firstArg)) {
+        return next();
+      }
 
       if (!args) {
         return ctx.reply(
@@ -573,6 +579,8 @@ module.exports = (bot) => {
             `/edit T3\n` +
             `/edit T-0003\n` +
             `/edit 3`
+            `Contoh budget:\n` +
+            `/edit B2`
         );
       }
 
@@ -585,6 +593,8 @@ module.exports = (bot) => {
             `/edit T3\n` +
             `/edit T-0003\n` +
             `/edit 3`
+            `Contoh budget:\n` +
+            `/edit B2`
         );
       }
 

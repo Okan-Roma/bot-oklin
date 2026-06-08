@@ -79,7 +79,6 @@ function parseTransactionDate(dateText) {
 
   const text = String(dateText).trim();
 
-  // DD-MM-YYYY
   let match = text.match(/^(\d{2})-(\d{2})-(\d{4})$/);
 
   if (match) {
@@ -90,7 +89,6 @@ function parseTransactionDate(dateText) {
     };
   }
 
-  // YYYY-MM-DD
   match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
 
   if (match) {
@@ -101,7 +99,6 @@ function parseTransactionDate(dateText) {
     };
   }
 
-  // DD/MM/YYYY
   match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
 
   if (match) {
@@ -177,6 +174,8 @@ function initAccountBudget(map, account) {
       account,
       limitBudget: 0,
       used: 0,
+      budgetIds: [],
+      hasBudget: false,
     };
   }
 }
@@ -191,8 +190,7 @@ function getProgressPercent(used, budget) {
 
 function getBudgetStatusText(used, budget) {
   if (!budget || budget <= 0) {
-    if (used > 0) return "⚠️ Belum ada budget";
-    return "Belum ada budget";
+    return "♾️ Unlimited";
   }
 
   const percent = getProgressPercent(used, budget);
@@ -208,32 +206,48 @@ function getBudgetStatusText(used, budget) {
   return `✅ Aman (${percent}%)`;
 }
 
-function buildBudgetSummaryBlock(label, limitBudget, used) {
+function buildBudgetSummaryBlock(
+  label,
+  limitBudget,
+  used,
+  budgetIds = [],
+  hasBudget = false
+) {
+  const budgetIdText = budgetIds.length ? budgetIds.join(", ") : "-";
+
+  if (!hasBudget) {
+    return (
+      `${label}\n` +
+      `ID Budget    : -\n` +
+      `Limit Budget : Rp 0\n` +
+      `Terpakai     : ${formatRupiah(used)}\n` +
+      `Sisa         : -\n` +
+      `Progress     : -\n` +
+      `Status       : ⚠️ Belum ada budget\n`
+    );
+  }
+
+  if (!limitBudget || limitBudget <= 0) {
+    return (
+      `${label}\n` +
+      `ID Budget    : ${budgetIdText}\n` +
+      `Limit Budget : ♾️ Tanpa limit\n` +
+      `Terpakai     : ${formatRupiah(used)}\n` +
+      `Sisa         : ♾️\n` +
+      `Progress     : -\n` +
+      `Status       : ♾️ Unlimited\n`
+    );
+  }
+
   const remaining = limitBudget - used;
   const percent = getProgressPercent(used, limitBudget);
   const status = getBudgetStatusText(used, limitBudget);
 
   let message =
     `${label}\n` +
+    `ID Budget    : ${budgetIdText}\n` +
     `Limit Budget : ${formatRupiah(limitBudget)}\n` +
     `Terpakai     : ${formatRupiah(used)}\n`;
-
-  // ==============================
-  // ✅ Jika budget belum diset
-  // ==============================
-
-  if (!limitBudget || limitBudget <= 0) {
-    message +=
-      `Sisa         : -\n` +
-      `Progress     : -\n` +
-      `Status       : ${status}\n`;
-
-    return message;
-  }
-
-  // ==============================
-  // ✅ Jika over budget
-  // ==============================
 
   if (used > limitBudget) {
     message += `🚨 Over !!!   : ${formatRupiah(used - limitBudget)}\n`;
@@ -260,10 +274,6 @@ async function buildBudgetMessage(selectedAccount = "ALL") {
 
   const budgetByAccount = {};
 
-  // ==============================
-  // ✅ 1. Load budget TOTAL
-  // ==============================
-
   budgetRows
     .map(normalizeBudgetRow)
     .forEach((budget) => {
@@ -276,12 +286,14 @@ async function buildBudgetMessage(selectedAccount = "ALL") {
       }
 
       initAccountBudget(budgetByAccount, budget.account);
-      budgetByAccount[budget.account].limitBudget += budget.limitBudget;
-    });
 
-  // ==============================
-  // ✅ 2. Hitung pengeluaran aktual
-  // ==============================
+      budgetByAccount[budget.account].limitBudget += budget.limitBudget;
+      budgetByAccount[budget.account].hasBudget = true;
+
+      if (budget.idBudget && budget.idBudget !== "-") {
+        budgetByAccount[budget.account].budgetIds.push(budget.idBudget);
+      }
+    });
 
   transactionRows
     .map(normalizeTransaction)
@@ -310,7 +322,17 @@ async function buildBudgetMessage(selectedAccount = "ALL") {
     selectedAccount === "ALL" ? "Semua Account" : selectedAccount;
 
   const accounts = Object.values(budgetByAccount).sort((a, b) => {
-    return ACCOUNTS.indexOf(a.account) - ACCOUNTS.indexOf(b.account);
+    const indexA = ACCOUNTS.indexOf(a.account);
+    const indexB = ACCOUNTS.indexOf(b.account);
+
+    if (indexA === -1 && indexB === -1) {
+      return a.account.localeCompare(b.account);
+    }
+
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+
+    return indexA - indexB;
   });
 
   if (!accounts.length) {
@@ -326,12 +348,21 @@ async function buildBudgetMessage(selectedAccount = "ALL") {
   const totalLimit = accounts.reduce((sum, item) => sum + item.limitBudget, 0);
   const totalUsed = accounts.reduce((sum, item) => sum + item.used, 0);
 
+  const totalBudgetIds = accounts.flatMap((item) => item.budgetIds);
+  const totalHasBudget = accounts.some((item) => item.hasBudget);
+
   let message =
     `💸 Budget Bulanan\n\n` +
     `Periode : ${getMonthName(month)} ${year}\n` +
     `Account : ${accountText}\n\n`;
 
-  message += buildBudgetSummaryBlock("📌 Total", totalLimit, totalUsed);
+  message += buildBudgetSummaryBlock(
+    "📌 Total",
+    totalLimit,
+    totalUsed,
+    totalBudgetIds,
+    totalHasBudget
+  );
 
   if (selectedAccount === "ALL") {
     message += `━━━━━━━━━━━━━━━━━━━━\n\n`;
@@ -340,7 +371,9 @@ async function buildBudgetMessage(selectedAccount = "ALL") {
       message += buildBudgetSummaryBlock(
         `🏷 ${item.account}`,
         item.limitBudget,
-        item.used
+        item.used,
+        item.budgetIds,
+        item.hasBudget
       );
 
       message += `\n`;
@@ -355,7 +388,6 @@ async function buildBudgetMessage(selectedAccount = "ALL") {
 // ==============================
 
 module.exports = (bot) => {
-  // /budget = bulan ini + semua account
   bot.command("budget", async (ctx) => {
     try {
       const message = await buildBudgetMessage("ALL");

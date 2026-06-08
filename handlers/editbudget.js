@@ -64,8 +64,34 @@ function parseNominal(input) {
   return Math.round(number * multiplier);
 }
 
+function parseBudgetLimit(input) {
+  if (input === undefined || input === null) return null;
+
+  const raw = String(input).trim().toLowerCase();
+
+  if (
+    ["0", "nol", "unlimited", "tanpa_limit", "tanpa-limit", "tanpa limit"].includes(
+      raw
+    )
+  ) {
+    return 0;
+  }
+
+  return parseNominal(input);
+}
+
 function formatRupiah(value) {
   return "Rp " + Number(value || 0).toLocaleString("id-ID");
+}
+
+function formatBudgetLimit(value) {
+  const number = parseSheetNumber(value);
+
+  if (!number || number <= 0) {
+    return "♾️ Tanpa limit";
+  }
+
+  return formatRupiah(number);
 }
 
 function normalizeBudgetId(input) {
@@ -74,7 +100,7 @@ function normalizeBudgetId(input) {
   let text = String(input).trim().toUpperCase();
 
   text = text.replace(/^\/EDITBUDGET/i, "").trim();
-
+  text = text.replace(/^\/EDIT/i, "").trim();
   text = text.replace(/[^0-9]/g, "");
 
   const number = Number(text);
@@ -111,7 +137,6 @@ async function findBudgetById(budgetId) {
     const rowId = String(row["ID Budget"] || "").trim().toUpperCase();
 
     if (rowId === budgetId) {
-      // Budget sheet pakai header baris 1, data mulai baris 2
       found = normalizeBudgetRow(row, index + 2);
     }
   });
@@ -126,7 +151,7 @@ function buildBudgetDetailMessage(budget) {
     `Account   : ${budget.account}\n` +
     `Periode   : ${budget.bulan}-${budget.tahun}\n` +
     `Kategori  : ${budget.kategori}\n` +
-    `Limit     : ${formatRupiah(budget.limitBudget)}\n` +
+    `Limit     : ${formatBudgetLimit(budget.limitBudget)}\n` +
     `Notif 80% : ${budget.notif80}\n` +
     `Notif 100%: ${budget.notif100}\n` +
     `Status    : ${budget.status}\n` +
@@ -138,15 +163,16 @@ function buildBudgetDetailMessage(budget) {
 function buildEditBudgetFieldKeyboard(budgetId) {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback("💰 Limit Budget", `editbudget_field:${budgetId}:limit`),
+      Markup.button.callback(
+        "💰 Limit Budget",
+        `editbudget_field:${budgetId}:limit`
+      ),
     ],
     [
       Markup.button.callback("✅ Status", `editbudget_field:${budgetId}:status`),
       Markup.button.callback("📝 Catatan", `editbudget_field:${budgetId}:catatan`),
     ],
-    [
-      Markup.button.callback("❌ Batal", "editbudget_cancel"),
-    ],
+    [Markup.button.callback("❌ Batal", "editbudget_cancel")],
   ]);
 }
 
@@ -156,9 +182,7 @@ function buildStatusKeyboard() {
       Markup.button.callback("Aktif", "editbudget_status:Aktif"),
       Markup.button.callback("Nonaktif", "editbudget_status:Nonaktif"),
     ],
-    [
-      Markup.button.callback("❌ Batal", "editbudget_cancel"),
-    ],
+    [Markup.button.callback("❌ Batal", "editbudget_cancel")],
   ]);
 }
 
@@ -175,13 +199,15 @@ function getFieldLabel(field) {
   if (field === "limit") return "Limit Budget";
   if (field === "status") return "Status";
   if (field === "catatan") return "Catatan";
+
   return field;
 }
 
 function getOldValueByField(budget, field) {
-  if (field === "limit") return formatRupiah(budget.limitBudget);
+  if (field === "limit") return formatBudgetLimit(budget.limitBudget);
   if (field === "status") return budget.status;
   if (field === "catatan") return budget.catatan;
+
   return "-";
 }
 
@@ -201,6 +227,54 @@ function buildConfirmMessage(budget, field, oldValue, newValue) {
 // ==============================
 
 module.exports = (bot) => {
+  async function handleEditBudgetCommand(ctx, rawArgs) {
+    const args = String(rawArgs || "").trim();
+
+    if (!args) {
+      return ctx.reply(
+        `⚠️ Format edit budget belum lengkap.\n\n` +
+          `Contoh:\n` +
+          `/editbudget B2\n` +
+          `/editbudget B-0002\n` +
+          `/editbudget 2\n` +
+          `/edit B2`
+      );
+    }
+
+    const normalizedId = normalizeBudgetId(args);
+
+    if (!normalizedId) {
+      return ctx.reply(
+        `⚠️ ID budget tidak dikenali.\n\n` +
+          `Contoh:\n` +
+          `/editbudget B2\n` +
+          `/editbudget 2\n` +
+          `/edit B2`
+      );
+    }
+
+    const budget = await findBudgetById(normalizedId);
+
+    if (!budget) {
+      return ctx.reply(
+        `⚠️ Budget ${normalizedId} tidak ditemukan.\n\n` +
+          `Pastikan ID budget sudah benar.`
+      );
+    }
+
+    const userKey = String(ctx.from.id);
+
+    editBudgetSessions.set(userKey, {
+      step: "choose_field",
+      budget,
+    });
+
+    return ctx.reply(
+      buildBudgetDetailMessage(budget),
+      buildEditBudgetFieldKeyboard(budget.idBudget)
+    );
+  }
+
   // ==============================
   // ✅ /editbudget
   // ==============================
@@ -210,49 +284,33 @@ module.exports = (bot) => {
       const text = ctx.message.text || "";
       const args = text.split(" ").slice(1).join(" ").trim();
 
-      if (!args) {
-        return ctx.reply(
-          `⚠️ Format edit budget belum lengkap.\n\n` +
-            `Contoh:\n` +
-            `/editbudget B2\n` +
-            `/editbudget B-0002\n` +
-            `/editbudget 2`
-        );
-      }
-
-      const normalizedId = normalizeBudgetId(args);
-
-      if (!normalizedId) {
-        return ctx.reply(
-          `⚠️ ID budget tidak dikenali.\n\n` +
-            `Contoh:\n` +
-            `/editbudget B2\n` +
-            `/editbudget 2`
-        );
-      }
-
-      const budget = await findBudgetById(normalizedId);
-
-      if (!budget) {
-        return ctx.reply(
-          `⚠️ Budget ${normalizedId} tidak ditemukan.\n\n` +
-            `Pastikan ID budget sudah benar.`
-        );
-      }
-
-      const userKey = String(ctx.from.id);
-
-      editBudgetSessions.set(userKey, {
-        step: "choose_field",
-        budget,
-      });
-
-      return ctx.reply(
-        buildBudgetDetailMessage(budget),
-        buildEditBudgetFieldKeyboard(budget.idBudget)
-      );
+      return await handleEditBudgetCommand(ctx, args);
     } catch (error) {
       console.error("Error /editbudget:", error);
+
+      return ctx.reply(
+        "⚠️ Gagal memproses edit budget.\nSilakan coba lagi beberapa saat."
+      );
+    }
+  });
+
+  // ==============================
+  // ✅ /edit B2 alias untuk budget
+  // ==============================
+
+  bot.command("edit", async (ctx, next) => {
+    try {
+      const text = ctx.message.text || "";
+      const args = text.split(" ").slice(1).join(" ").trim();
+      const firstArg = args.split(/\s+/)[0] || "";
+
+      if (!/^b/i.test(firstArg)) {
+        return next();
+      }
+
+      return await handleEditBudgetCommand(ctx, args);
+    } catch (error) {
+      console.error("Error /edit budget alias:", error);
 
       return ctx.reply(
         "⚠️ Gagal memproses edit budget.\nSilakan coba lagi beberapa saat."
@@ -294,7 +352,8 @@ module.exports = (bot) => {
           `Contoh:\n` +
           `2000000\n` +
           `2jt\n` +
-          `1,5jt`
+          `1,5jt\n` +
+          `0 untuk tanpa limit`
       );
     }
 
@@ -339,11 +398,12 @@ module.exports = (bot) => {
     const budget = session.budget;
 
     session.step = "confirm";
+    session.field = "status";
     session.newDisplayValue = newStatus;
     session.oldDisplayValue = getOldValueByField(budget, "status");
     session.updates = {
       I: newStatus,
-      J: `Diedit via Bot Telegram - Status`,
+      J: "Diedit via Bot Telegram - Status",
     };
 
     editBudgetSessions.set(userKey, session);
@@ -380,16 +440,21 @@ module.exports = (bot) => {
     const budget = session.budget;
 
     if (field === "limit") {
-      const nominal = parseNominal(input);
+      const nominal = parseBudgetLimit(input);
 
-      if (!nominal) {
+      if (nominal === null || nominal === undefined || Number.isNaN(nominal)) {
         return ctx.reply(
-          "⚠️ Limit budget baru tidak dikenali.\n\nContoh: 2jt"
+          "⚠️ Limit budget baru tidak dikenali.\n\n" +
+            "Contoh:\n" +
+            "2jt\n" +
+            "1500000\n" +
+            "0 untuk tanpa limit"
         );
       }
 
       session.step = "confirm";
-      session.newDisplayValue = formatRupiah(nominal);
+      session.newDisplayValue =
+        nominal === 0 ? "♾️ Tanpa limit" : formatRupiah(nominal);
       session.oldDisplayValue = getOldValueByField(budget, "limit");
       session.updates = {
         F: nominal,
