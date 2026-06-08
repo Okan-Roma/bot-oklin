@@ -257,6 +257,54 @@ async function getActiveBudgetsByMonthYear(month, year) {
 }
 
 // ==============================
+// ✅ Copy Budget
+// ==============================
+
+async function getAllBudgetRows() {
+  return getSheetRows("Budget", "A:J");
+}
+
+async function generateNextBudgetId() {
+  const rows = await getAllBudgetRows();
+
+  let maxNumber = 0;
+
+  rows.forEach((row) => {
+    const id = String(row["ID Budget"] || "").trim().toUpperCase();
+    const match = id.match(/^B-(\d+)$/);
+
+    if (match) {
+      const number = Number(match[1]);
+
+      if (!Number.isNaN(number) && number > maxNumber) {
+        maxNumber = number;
+      }
+    }
+  });
+
+  const nextNumber = maxNumber + 1;
+
+  return `B-${String(nextNumber).padStart(4, "0")}`;
+}
+
+async function appendBudgetRows(rowsData) {
+  if (!rowsData || !rowsData.length) {
+    return;
+  }
+
+  const sheets = await getSheetsClient();
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: "Budget!A:J",
+    valueInputOption: "USER_ENTERED",
+    requestBody: {
+      values: rowsData,
+    },
+  });
+}
+
+// ==============================
 // ✅ EXPORT
 // ==============================
 
@@ -270,4 +318,5 @@ module.exports = {
   updateTransactionStatusAndNote,
   updateTransactionCells,
   getActiveBudgetsByMonthYear,
+  appendBudgetRows,
 };

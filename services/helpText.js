@@ -27,6 +27,8 @@ function buildHelpMessage() {
     `/rekap - rekap bulan ini\n` +
     `/kategori - rekap kategori bulan ini\n` +
     `/budget - laporan budget bulanan\n` +
+    `/copybudget - copy budget bulan sebelumnya ke bulan ini\n` +
+    `/copybudget next - copy budget bulan ini ke bulan depan\n` +
     `/batal - batalkan input berjalan\n` +
     `/ver - versi bot\n\n` +
 
