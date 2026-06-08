@@ -21,6 +21,7 @@ const kategoriHandler = require("../handlers/kategori");
 const budgetHandler = require("../handlers/budget");
 const copyBudgetHandler = require("../handlers/copybudget");
 const editBudgetHandler = require("../handlers/editbudget");
+const budgetKategoriHandler = require("../handlers/budgetKategori");
 
 const { menuHandler, mainMenuKeyboard } = require("../handlers/menu");
 
@@ -103,6 +104,7 @@ if (env.BOT_TOKEN) {
   kategoriHandler(bot);
   budgetHandler(bot);
   copyBudgetHandler(bot);
+  budgetKategoriHandler(bot);
 }
 
 if (bot) {

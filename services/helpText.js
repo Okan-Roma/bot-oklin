@@ -30,6 +30,7 @@ function buildHelpMessage() {
     `/copybudget - copy budget bulan sebelumnya ke bulan ini\n` +
     `/copybudget next - copy budget bulan ini ke bulan depan\n` +
     `/editbudget B2 - edit limit/status/catatan budget\n` +
+    `/budgetkategori - laporan budget per kategori bulan ini\n` +
     `/batal - batalkan input berjalan\n` +
     `/ver - versi bot\n\n` +
 
