@@ -69,6 +69,10 @@ function pad2(value) {
   return String(value).padStart(2, "0");
 }
 
+// ==============================
+// ✅ HELPERS WIB
+// ==============================
+
 function getTimestampInputWIB() {
   const now = new Date();
 
@@ -116,6 +120,10 @@ function getTodayDateWIB() {
 
   return `${day}-${month}-${year}`;
 }
+
+// ==============================
+// ✅ HELPERS TANGGAL MANUAL
+// ==============================
 
 function parseManualDate(input) {
   const text = String(input || "").trim();
@@ -173,7 +181,9 @@ function validateTransactionDate(date) {
   if (date > today) {
     return {
       valid: false,
-      message: "Tanggal transaksi tidak boleh tanggal masa depan.",
+      message:
+        "Tanggal transaksi tidak boleh tanggal masa depan.\n\n" +
+        "Gunakan tanggal hari ini atau maksimal 30 hari ke belakang.",
     };
   }
 
@@ -183,13 +193,25 @@ function validateTransactionDate(date) {
   if (diffDays > 30) {
     return {
       valid: false,
-      message: "Tanggal transaksi maksimal 30 hari ke belakang.",
+      message:
+        "Tanggal transaksi maksimal 30 hari ke belakang.\n\n" +
+        "Silakan gunakan tanggal yang lebih dekat.",
     };
   }
 
   return {
     valid: true,
   };
+}
+
+function looksLikeUnsupportedDateFormat(token) {
+  const text = String(token || "").trim();
+
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(text) || // YYYY-MM-DD
+    /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text) || // DD/MM/YYYY
+    /^\d{1,2}-\d{1,2}-\d{4}$/.test(text) // D-M-YYYY
+  );
 }
 
 function parseOptionalFastDate(token) {
@@ -199,13 +221,15 @@ function parseOptionalFastDate(token) {
 
   const text = String(token).trim();
 
-  // Format valid fast input: DD-MM-YYYY
+  // Format yang didukung: DD-MM-YYYY
   if (/^\d{2}-\d{2}-\d{4}$/.test(text)) {
     const parsedDate = parseManualDate(text);
 
     if (!parsedDate) {
       throw new Error(
-        "Tanggal tidak valid.\nGunakan format DD-MM-YYYY.\nContoh: 02-06-2026"
+        "Tanggal tidak valid.\n\n" +
+          "Gunakan format DD-MM-YYYY.\n" +
+          "Contoh: 07-06-2026"
       );
     }
 
@@ -218,13 +242,14 @@ function parseOptionalFastDate(token) {
     return formatDateToDDMMYYYY(parsedDate);
   }
 
-  // Kalau user input format tanggal lain, kasih arahan
-  if (
-    /^\d{4}-\d{2}-\d{2}$/.test(text) ||
-    /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)
-  ) {
+  // Kalau bentuknya terlihat seperti tanggal, tapi formatnya salah
+  if (looksLikeUnsupportedDateFormat(text)) {
     throw new Error(
-      "Format tanggal belum didukung untuk fast input.\nGunakan DD-MM-YYYY.\nContoh: 02-06-2026"
+      "Format tanggal fast input belum didukung.\n\n" +
+        "Gunakan format DD-MM-YYYY.\n" +
+        "Contoh:\n" +
+        "out 07-06-2026 25k makan cash beli nasi\n" +
+        "out m 07-06-2026 50k makan cash belanja sayur"
     );
   }
 
@@ -358,7 +383,6 @@ async function parseFastInput(text) {
   if (!raw) return null;
 
   const tokens = raw.split(/\s+/);
-
   const command = normalizeText(tokens[0]);
 
   if (!["in", "out", "tf"].includes(command)) {
@@ -376,10 +400,10 @@ async function parseFastInput(text) {
   }
 
   // ==============================
-  // ✅ TANGGAL MANUAL OPSIONAL
+  // ✅ Tanggal manual opsional
   // Format:
-  // out 02-06-2026 100rb makan bni ket
-  // out m 02-06-2026 100rb makan cash ket
+  // out 07-06-2026 100rb makan bca ket
+  // out m 07-06-2026 100rb makan cash ket
   // ==============================
 
   let transactionDate = getTodayDateWIB();
@@ -402,7 +426,12 @@ async function parseFastInput(text) {
 
     if (!nominalInput || !categoryInput || !walletInput) {
       throw new Error(
-        "Format belum lengkap.\n\nContoh:\nout 25k makan cash beli nasi\nin 3jt payroll bca gaji bulan mei"
+        "Format belum lengkap.\n\n" +
+          "Contoh:\n" +
+          "out 25k makan cash beli nasi\n" +
+          "out 07-06-2026 25k makan cash beli nasi\n" +
+          "in 3jt payroll bca gaji bulan mei\n" +
+          "in 07-06-2026 3jt payroll bca gaji bulan juni"
       );
     }
 
@@ -421,7 +450,6 @@ async function parseFastInput(text) {
     }
 
     const description = tokens.slice(index + 3).join(" ").trim() || "-";
-
     const jenis = command === "in" ? "Pemasukan" : "Pengeluaran";
 
     const category =
@@ -453,7 +481,10 @@ async function parseFastInput(text) {
 
     if (!nominalInput || !sourceWalletInput || !targetWalletInput) {
       throw new Error(
-        "Format transfer belum lengkap.\n\nContoh:\ntf 100k bca cash tarik tunai"
+        "Format transfer belum lengkap.\n\n" +
+          "Contoh:\n" +
+          "tf 100k bca cash tarik tunai\n" +
+          "tf 07-06-2026 100k bca cash tarik tunai"
       );
     }
 
@@ -521,7 +552,8 @@ function buildFastInputSummary(session) {
   }
 
   const icon = session.jenis === "Pemasukan" ? "➕" : "➖";
-  const dompetLabel = session.jenis === "Pemasukan" ? "Dompet Tujuan" : "Dompet Sumber";
+  const dompetLabel =
+    session.jenis === "Pemasukan" ? "Dompet Tujuan" : "Dompet Sumber";
 
   return (
     `⚡ Konfirmasi Fast Input\n\n` +
@@ -679,24 +711,26 @@ module.exports = (bot) => {
       }
 
       const userKey = String(ctx.from.id);
-
       fastInputSessions.set(userKey, parsed);
 
       return ctx.reply(buildFastInputSummary(parsed), buildConfirmKeyboard());
     } catch (error) {
+      console.error("Error fast input parse:", error);
+
       return ctx.reply(
-        `⚠️ Fast input belum bisa diproses.\n\n${error.message}\n\n` +
-          `Contoh:\n` +
+        `⚠️ Fast input belum bisa diproses.\n\n` +
+          `${error.message}\n\n` +
+          `Format yang didukung:\n` +
           `out 25k makan cash beli nasi\n` +
-          `out 02-06-2026 25k makan cash beli nasi\n` +
-          `in 3jt payroll bca gaji bulan mei\n` +
-          `in 01-06-2026 3jt payroll bca gaji bulan mei\n` +
-          `tf 100k bca cash tarik tunai\n\n` +
-          `tf 03-06-2026 100k bca cash tarik tunai\n\n` +
+          `out 07-06-2026 25k makan cash beli nasi\n` +
+          `in 3jt payroll bca gaji bulan juni\n` +
+          `in 07-06-2026 3jt payroll bca gaji bulan juni\n` +
+          `tf 100k bca cash tarik tunai\n` +
+          `tf 07-06-2026 100k bca cash tarik tunai\n\n` +
           `Account opsional:\n` +
           `m = Mamah, i = Isal\n` +
-          `Contoh: out m 50k makan cash belanja sayur`
-          `Contoh: out m 02-06-2026 50k makan cash belanja sayur`
+          `Contoh:\n` +
+          `out m 07-06-2026 50k makan cash belanja sayur`
       );
     }
   });
@@ -732,7 +766,6 @@ module.exports = (bot) => {
       }
 
       return ctx.reply(message);
-
     } catch (error) {
       console.error("Error fast_save:", error);
 
